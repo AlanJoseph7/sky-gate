@@ -242,11 +242,6 @@ Anomaly values (e.g. teleport: 500km/step) dominated the MinMaxScaler range, col
 
 ---
 
-## 🎤 Interview Summary
-
-> *"I built SkyGate — a real-time ADS-B anomaly detection system for aviation cybersecurity. ADS-B signals are unauthenticated, making them vulnerable to spoofing attacks. The system ingests live flight data from the OpenSky Network and adsb.lol APIs over Indian airspace, and uses a three-layer pipeline: physics-based rule detection, unsupervised Isolation Forest, and a feedforward autoencoder trained on normal flight data. Synthetic anomalies are injected into real ADS-B data for model training and evaluation. The three detectors are combined using a weighted ensemble where weights are derived dynamically from each detector's F1 score. The final system achieves 0.83 recall and 0.77 F1, catching 83% of injected anomalies including teleportation, speed spikes, and subtle multi-step flight pattern drift."*
-
----
 
 ## 📋 Requirements
 
