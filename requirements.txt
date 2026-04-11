@@ -1,0 +1,23 @@
+# Core data handling
+numpy==1.26.4
+pandas==2.2.2
+
+# Visualisation
+matplotlib==3.9.0
+
+# Machine learning
+scikit-learn==1.5.0
+
+# Deep learning (CPU-only)
+tensorflow-cpu==2.16.1
+keras==3.3.3
+tf_keras==2.16.0
+ml_dtypes==0.3.2
+protobuf==4.25.9
+
+# Web server
+fastapi
+uvicorn[standard]
+sse-starlette
+requests
+httpx
