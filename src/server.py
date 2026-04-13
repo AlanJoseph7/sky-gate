@@ -105,10 +105,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
  
-# Serve static frontend from ./frontend/
 FRONTEND_DIR = Path(__file__).parent / "frontend"
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
  
  
 # ─────────────────────────────────────────────────────────────────────────────
@@ -204,16 +201,8 @@ def _now() -> str:
  
  
 # ─────────────────────────────────────────────────────────────────────────────
-# Routes
+# API Routes  — must be declared BEFORE the static file mount below
 # ─────────────────────────────────────────────────────────────────────────────
- 
-@app.get("/")
-async def index():
-    index_file = FRONTEND_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file), headers={"Cache-Control": "no-cache"})
-    return JSONResponse({"status": "SkyGate API running — place index.html in ./frontend/"})
- 
  
 @app.get("/api/stats")
 async def api_stats():
@@ -235,16 +224,6 @@ async def api_logs():
  
 # ─────────────────────────────────────────────────────────────────────────────
 # Flight Detail  — combines adsb.lol (live state) + OpenSky (metadata/history)
-#
-#   adsb.lol  → altitude (ft), speed (kts), heading, squawk, vertical rate
-#   OpenSky   → manufacturer, full type name, registration, owner/operator
-#   OpenSky   → last known departure / arrival airports  (needs credentials)
-#
-#   All three calls are made concurrently with asyncio.gather so the response
-#   is as fast as the slowest single API rather than their sum.
-#
-#   Failures are silently swallowed — the frontend falls back to mock data
-#   for any field that is missing.
 # ─────────────────────────────────────────────────────────────────────────────
 @app.get("/api/flight-detail/{icao24}")
 async def flight_detail(icao24: str):
@@ -253,7 +232,6 @@ async def flight_detail(icao24: str):
  
     async with httpx.AsyncClient(timeout=7.0) as client:
  
-        # ── helper: silent fetch ──────────────────────────────────────────────
         async def _get(url: str, **kwargs):
             try:
                 r = await client.get(url, **kwargs)
@@ -261,7 +239,6 @@ async def flight_detail(icao24: str):
             except Exception:
                 return None
  
-        # ── fire all three requests concurrently ──────────────────────────────
         adsblol_task = _get(f"https://api.adsb.lol/v2/icao/{icao24}")
  
         meta_kwargs  = {"auth": _opensky_auth} if _opensky_auth else {}
@@ -278,59 +255,49 @@ async def flight_detail(icao24: str):
                 auth=_opensky_auth,
             )
         else:
-            flt_task = asyncio.sleep(0, result=None)   # no-op coroutine
+            flt_task = asyncio.sleep(0, result=None)
  
         adsblol_data, meta_data, flt_data = await asyncio.gather(
             adsblol_task, meta_task, flt_task
         )
  
-        # ── 1. adsb.lol live state ────────────────────────────────────────────
         if adsblol_data:
             ac_list = adsblol_data.get("ac") or adsblol_data.get("aircraft") or []
             if ac_list:
                 ac = ac_list[0]
- 
-                # alt_baro is either a number (feet) or the string "ground"
                 alt_raw   = ac.get("alt_baro")
                 on_ground = alt_raw == "ground" or bool(ac.get("on_ground", False))
                 alt_ft    = None if (on_ground or alt_raw is None) else (
                     int(alt_raw) if isinstance(alt_raw, (int, float)) else None
                 )
- 
                 result.update({
                     "callsign":      (ac.get("flight") or ac.get("callsign") or "").strip(),
                     "registration":   ac.get("r") or "—",
                     "origin_country": ac.get("r")[:2] if ac.get("r") else "—",
                     "baro_altitude":  alt_ft,
-                    "alt_unit":       "ft",      # tells frontend: skip m→ft conversion
-                    "velocity":       ac.get("gs"),          # already in knots
-                    "vel_unit":       "kts",     # tells frontend: skip m/s→kts conversion
+                    "alt_unit":       "ft",
+                    "velocity":       ac.get("gs"),
+                    "vel_unit":       "kts",
                     "true_track":     ac.get("track"),
                     "vertical_rate":  ac.get("baro_rate") or ac.get("geom_rate"),
                     "on_ground":      on_ground,
                     "squawk":         str(ac.get("squawk") or ""),
-                    # ICAO type code e.g. "A320" — may be overridden by OpenSky below
                     "aircraft_type":  ac.get("t") or ac.get("type"),
                     "wake_category":  ac.get("category"),
                 })
  
-        # ── 2. OpenSky metadata ───────────────────────────────────────────────
         if meta_data:
             result.update({
-                # richer manufacturer name e.g. "Airbus" not just "AIR"
                 "manufacturer":  meta_data.get("manufacturerName") or meta_data.get("manufacturer"),
-                # OpenSky typecode is more reliable than adsb.lol "t" field
                 "aircraft_type": meta_data.get("typecode") or result.get("aircraft_type"),
                 "wake_category": meta_data.get("wakeTurbulenceCategory") or result.get("wake_category"),
                 "operator":      meta_data.get("operatorCallsign") or meta_data.get("operatorIcao"),
                 "owner":         meta_data.get("owner"),
-                # OpenSky registration is canonical
                 "registration":  meta_data.get("registration") or result.get("registration"),
             })
  
-        # ── 3. OpenSky flights (dep / arr airports) ───────────────────────────
         if flt_data and isinstance(flt_data, list) and len(flt_data) > 0:
-            last = flt_data[-1]   # most recently completed flight segment
+            last = flt_data[-1]
             result["departure_airport"] = last.get("estDepartureAirport") or "???"
             result["arrival_airport"]   = last.get("estArrivalAirport")   or "???"
  
@@ -338,31 +305,21 @@ async def flight_detail(icao24: str):
  
  
 # ─────────────────────────────────────────────────────────────────────────────
-# SSE  (keep this AFTER flight-detail so the route order is correct)
+# SSE
 # ─────────────────────────────────────────────────────────────────────────────
 @app.get("/api/stream")
 async def api_stream(request: Request):
-    """
-    Server-Sent Events endpoint.
-    Browser connects once; server pushes log lines, stats, and anomaly
-    updates in real time without polling.
-    """
     q: asyncio.Queue = asyncio.Queue(maxsize=200)
     _sse_queues.append(q)
  
-    # Snapshot recent state for this new connection
     with _state_lock:
         seed_logs  = list(reversed(STATE["live_log"][:20]))
         seed_stats = _stats_payload()
  
     async def _generator():
-        # Seed existing log lines so terminal isn't empty on load
         for entry in seed_logs:
             yield {"event": "log", "data": json.dumps(entry)}
- 
-        # Seed current stats immediately
         yield {"event": "stats", "data": json.dumps(seed_stats)}
- 
         try:
             while True:
                 if await request.is_disconnected():
@@ -371,7 +328,6 @@ async def api_stream(request: Request):
                     msg = await asyncio.wait_for(q.get(), timeout=20.0)
                     yield msg
                 except asyncio.TimeoutError:
-                    # Heartbeat keeps load-balancers / proxies alive
                     yield {"event": "heartbeat", "data": "{}"}
         except asyncio.CancelledError:
             pass
@@ -380,6 +336,31 @@ async def api_stream(request: Request):
                 _sse_queues.remove(q)
  
     return EventSourceResponse(_generator())
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Static frontend — mounted LAST so API routes above always take priority.
+#
+# StaticFiles with html=True automatically serves:
+#   /                  → frontend/index.html
+#   /pipeline.html     → frontend/pipeline.html
+#   /monitor.html      → frontend/monitor.html
+#   /anomalies.html    → frontend/anomalies.html
+#   /features.html     → frontend/features.html
+#   /styles.css        → frontend/styles.css
+#   /shared.js         → frontend/shared.js
+#
+# Place all HTML/CSS/JS files directly inside ./frontend/
+# ─────────────────────────────────────────────────────────────────────────────
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+else:
+    @app.get("/")
+    async def index_fallback():
+        return JSONResponse({
+            "status": "SkyGate API running",
+            "note": "Create a ./frontend/ folder and place index.html + other pages inside it."
+        })
  
  
 # ─────────────────────────────────────────────────────────────────────────────

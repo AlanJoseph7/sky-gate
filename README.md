@@ -140,7 +140,7 @@ SkyGate/
 ### 1. Clone and set up environment
 
 ```bash
-git clone https://github.com/yourusername/skygate.git
+git clone https://github.com/AlanJoseph7/sky-gate.git
 cd skygate
 python -m venv venv
 venv\Scripts\activate        # Windows

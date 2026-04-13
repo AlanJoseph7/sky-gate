@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkyGate — Anomaly Ledger</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='12' stroke='%2300d4ff' stroke-opacity='0.3' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='7' stroke='%2300d4ff' stroke-opacity='0.55' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2300d4ff'/%3E%3Cline x1='16' y1='4' x2='16' y2='28' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='4' y1='16' x2='28' y2='16' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='16' y1='16' x2='25' y2='9' stroke='%2300d4ff' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='10' r='1.8' fill='%23ff4444'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    /* Anomaly type legend */
+    .anomaly-types {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 40px;
+      animation: fadeUp .5s var(--ease-out) both;
+    }
+    .atype-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-top-color: var(--glass-border-top);
+      border-radius: var(--r-lg);
+      padding: 16px 18px;
+      backdrop-filter: var(--glass-blur-sm);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .atype-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .atype-name { font-size: 12px; font-weight: 700; color: var(--text); }
+    .atype-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; font-family: 'Geist Mono', monospace; }
+    .atype-layer { font-size: 10px; color: var(--text-dim); margin-top: 4px; letter-spacing: .04em; }
+    @media(max-width:900px) { .anomaly-types { grid-template-columns: 1fr 1fr; } }
+    @media(max-width:500px) { .anomaly-types { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div id="theme-ripple"></div>
+<div id="aurora"></div>
+
+<nav id="main-nav">
+  <a href="index.html" class="nav-logo">
+    <div style="width:28px;height:28px" id="nav-logo-svg"></div>
+    <span class="nav-logo-text">SkyGate</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="pipeline.html">Pipeline</a></li>
+    <li><a href="monitor.html">Monitor</a></li>
+    <li><a href="anomalies.html">Anomalies</a></li>
+    <li><a href="features.html">Features</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="status-pill" id="connection-indicator">
+      <span class="status-dot"></span>
+      <span id="conn-text">CONNECTING…</span>
+    </div>
+    <button class="theme-toggle" id="theme-btn" aria-label="Toggle theme" onclick="toggleTheme()">
+      <span class="theme-icon icon-sun">☀</span>
+      <span class="theme-icon icon-moon">☽</span>
+    </button>
+    <a href="monitor.html" class="btn btn-primary">Live Monitor</a>
+  </div>
+</nav>
+
+<div class="page-shell">
+  <div class="page-hero">
+    <div class="section-label">// ANOMALY LEDGER</div>
+    <h1>Recent <em>detections</em></h1>
+    <p>Live log of all anomalies flagged by the detection pipeline. Click any row to expand flight detail. Refreshes every 30 seconds.</p>
+  </div>
+
+  <section class="inner">
+    <!-- Anomaly type legend -->
+    <div class="section-label">// ANOMALY TYPES</div>
+    <div class="anomaly-types">
+      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Altitude Jump</div><div class="atype-desc">±5000–10000ft spike</div><div class="atype-layer">RULES + ISOLATION FOREST</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Teleportation</div><div class="atype-desc">Impossible lat/lon jump</div><div class="atype-layer">RULES + ISOLATION FOREST</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Speed Spike</div><div class="atype-desc">Exceeds physical velocity limits</div><div class="atype-layer">RULES + ISOLATION FOREST</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Gradual Speed Drift</div><div class="atype-desc">Compounding over 10+ steps</div><div class="atype-layer">AUTOENCODER</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Altitude Oscillation</div><div class="atype-desc">Rapid ±1500–2500ft pattern</div><div class="atype-layer">AUTOENCODER</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Heading Oscillation</div><div class="atype-desc">Zigzag ±20–45° pattern</div><div class="atype-layer">AUTOENCODER</div></div></div>
+    </div>
+
+    <!-- Table -->
+    <div class="section-label">// FLAGGED FLIGHTS</div>
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Click any row to expand flight details.</p>
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-header-title">Flagged Flights</span>
+        <div class="filter-tabs">
+          <span class="filter-tab active" data-filter="all">ALL</span>
+          <span class="filter-tab" data-filter="critical">CRITICAL</span>
+          <span class="filter-tab" data-filter="warn">WARN</span>
+          <span class="filter-tab" data-filter="info">INFO</span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>ICAO 24</th>
+            <th>CALLSIGN</th>
+            <th>ANOMALY TYPE</th>
+            <th>LAYER</th>
+            <th>SCORE</th>
+            <th>SEVERITY</th>
+            <th>TIMESTAMP</th>
+          </tr>
+        </thead>
+        <tbody id="anomaly-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-left">
+      <span class="footer-logo">SkyGate</span>
+      <div class="footer-sep"></div>
+      <span class="footer-copy">© 2025 · ADS-B Anomaly Detection</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/AlanJoseph7/sky-gate" target="_blank">GitHub</a>
+      <a href="https://opensky-network.org" target="_blank">OpenSky</a>
+      <a href="monitor.html">Monitor</a>
+      <a href="/api/anomalies" target="_blank">API</a>
+    </div>
+  </footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  document.getElementById('nav-logo-svg').innerHTML = NAV_LOGO_SVG;
+
+  const SEV_BADGE   = { critical:'badge-red', warn:'badge-yellow', info:'badge-blue' };
+  const LAYER_BADGE = { 'Rule-Based':'badge-blue', 'Iso Forest':'badge-yellow', 'Autoencoder':'badge-red' };
+  let allAnomalies = [], activeFilter = 'all', tableRendering = false, expandedIcao = null;
+
+  async function loadAnomalies() {
+    try {
+      const r = await fetch(`${API}/api/anomalies`);
+      if (!r.ok) return;
+      allAnomalies = await r.json();
+      renderTable();
+    } catch(e) {}
+  }
+
+  function renderTable(instant = false) {
+    if (tableRendering) return;
+    const tbody = document.getElementById('anomaly-tbody');
+    const rows = allAnomalies.filter(a => activeFilter === 'all' || a.severity === activeFilter);
+    if (instant) { _injectRows(tbody, rows); return; }
+    tableRendering = true;
+    tbody.classList.add('fading');
+    setTimeout(() => { _injectRows(tbody, rows); tbody.classList.remove('fading'); tableRendering = false; }, 220);
+  }
+
+  function _injectRows(tbody, rows) {
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No anomalies detected yet.</td></tr>`; expandedIcao = null; return; }
+    const scoreColor = s => s === 'critical' ? 'var(--red)' : s === 'warn' ? 'var(--yellow)' : 'var(--accent)';
+    tbody.innerHTML = rows.slice(0, 50).map((a, i) => {
+      const score = a.score ?? null;
+      const scoreNum = typeof score === 'number' ? score.toFixed(2) : (score || '—');
+      const scorePct = typeof score === 'number' ? Math.min(score, 1) * 100 : 0;
+      const sColor = scoreColor(a.severity);
+      const icao = (a.icao24 || '').toLowerCase();
+      return `
+        <tr class="data-row" data-icao="${icao}" style="animation-delay:${i*22}ms" onclick="toggleDetail(this,'${icao}','${a.callsign||''}')">
+          <td><span class="expand-chevron">▾</span></td>
+          <td><span style="color:var(--accent);font-weight:700">${icao.toUpperCase()}</span></td>
+          <td>${a.callsign||'N/A'}</td>
+          <td>${a.anomaly||a.type||'—'}</td>
+          <td><span class="badge ${LAYER_BADGE[a.layer]||'badge-blue'}">${a.layer||'—'}</span></td>
+          <td><div class="score-wrap"><span style="color:${sColor}">${scoreNum}</span><div class="score-bar"><div class="score-fill" style="width:${scorePct}%;background:${sColor}"></div></div></div></td>
+          <td><span class="badge ${SEV_BADGE[a.severity]||'badge-blue'}">${(a.severity||'info').toUpperCase()}</span></td>
+          <td style="color:var(--text-dim)">${a.timestamp||'—'}</td>
+        </tr>
+        <tr class="detail-row" id="detail-${icao}">
+          <td colspan="8">
+            <div class="detail-panel" id="panel-${icao}">
+              <div class="detail-loading" id="loading-${icao}"><div class="detail-spinner"></div>Fetching flight data…</div>
+              <div class="detail-inner" id="inner-${icao}" style="display:none"></div>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
+  function toggleDetail(row, icao, callsign) {
+    const panel = document.getElementById(`panel-${icao}`);
+    const isOpen = row.classList.contains('expanded');
+    if (expandedIcao && expandedIcao !== icao) {
+      const prevRow = document.querySelector(`.data-row[data-icao="${expandedIcao}"]`);
+      const prevPanel = document.getElementById(`panel-${expandedIcao}`);
+      if (prevRow) prevRow.classList.remove('expanded');
+      if (prevPanel) prevPanel.classList.remove('open');
+    }
+    if (isOpen) { row.classList.remove('expanded'); panel.classList.remove('open'); expandedIcao = null; }
+    else { row.classList.add('expanded'); panel.classList.add('open'); expandedIcao = icao; loadFlightDetail(icao, callsign); }
+  }
+
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      activeFilter = this.dataset.filter;
+      expandedIcao = null;
+      renderTable();
+    });
+  });
+
+  loadAnomalies();
+  connectSSE();
+  setInterval(loadAnomalies, 30000);
+</script>
+</body>
+</html>

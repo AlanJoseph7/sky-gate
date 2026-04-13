@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkyGate — Features</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='12' stroke='%2300d4ff' stroke-opacity='0.3' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='7' stroke='%2300d4ff' stroke-opacity='0.55' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2300d4ff'/%3E%3Cline x1='16' y1='4' x2='16' y2='28' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='4' y1='16' x2='28' y2='16' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='16' y1='16' x2='25' y2='9' stroke='%2300d4ff' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='10' r='1.8' fill='%23ff4444'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    /* Tech stack card */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 48px;
+      margin-bottom: 56px;
+    }
+    .stack-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-top-color: var(--glass-border-top);
+      border-radius: var(--r-xl);
+      padding: 26px 28px;
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: var(--glass-blur-sm);
+      animation: fadeUp .5s var(--ease-out) both;
+      transition: transform .35s var(--spring), box-shadow .3s, border-color .3s;
+      position: relative; overflow: hidden;
+    }
+    .stack-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(58,223,255,0.4), transparent); opacity: 0; transition: opacity .4s; }
+    .stack-card:hover { transform: translateY(-4px); box-shadow: var(--glass-shadow-hover), var(--glass-glow); border-color: var(--border-hover); }
+    .stack-card:hover::before { opacity: 1; }
+    .stack-cat { font-family: 'Geist Mono', monospace; font-size: 9px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 10px; }
+    .stack-items { display: flex; flex-direction: column; gap: 6px; }
+    .stack-row { display: flex; justify-content: space-between; align-items: center; }
+    .stack-name { font-size: 13px; color: var(--text); font-weight: 600; }
+    .stack-ver { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--text-dim); }
+
+    /* Design decisions */
+    .decisions-list { display: flex; flex-direction: column; gap: 16px; margin-top: 48px; }
+    .decision-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-top-color: var(--glass-border-top);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--r-lg);
+      padding: 22px 26px;
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: var(--glass-blur-sm);
+      animation: fadeUp .5s var(--ease-out) both;
+      cursor: pointer;
+      transition: transform .3s var(--spring), box-shadow .3s, border-color .3s;
+    }
+    .decision-card:hover { transform: translateX(6px); box-shadow: var(--glass-shadow-hover); }
+    .decision-card[data-color="yellow"] { border-left-color: var(--yellow); }
+    .decision-card[data-color="green"]  { border-left-color: var(--green); }
+    .decision-card[data-color="red"]    { border-left-color: var(--red); }
+    .decision-q { font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .decision-chevron { font-size: 11px; color: var(--text-dim); transition: transform .35s var(--spring); flex-shrink: 0; }
+    .decision-card.open .decision-chevron { transform: rotate(180deg); }
+    .decision-body { max-height: 0; overflow: hidden; transition: max-height .4s cubic-bezier(0.16,1,0.3,1); }
+    .decision-card.open .decision-body { max-height: 200px; }
+    .decision-body p { font-size: 13px; color: var(--text-muted); line-height: 1.75; margin-top: 14px; }
+
+    /* Constraints */
+    .constraints-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 48px;
+    }
+    .constraint-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 22px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-lg);
+      backdrop-filter: var(--glass-blur-sm);
+      animation: fadeUp .4s var(--ease-out) both;
+    }
+    .constraint-tick { font-size: 18px; flex-shrink: 0; }
+    .constraint-text { font-size: 13px; color: var(--text-muted); }
+    .constraint-text strong { color: var(--text); }
+
+    @media(max-width:700px) { .stack-grid { grid-template-columns: 1fr; } .constraints-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div id="theme-ripple"></div>
+<div id="aurora"></div>
+
+<nav id="main-nav">
+  <a href="index.html" class="nav-logo">
+    <div style="width:28px;height:28px" id="nav-logo-svg"></div>
+    <span class="nav-logo-text">SkyGate</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="pipeline.html">Pipeline</a></li>
+    <li><a href="monitor.html">Monitor</a></li>
+    <li><a href="anomalies.html">Anomalies</a></li>
+    <li><a href="features.html">Features</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="status-pill" id="connection-indicator">
+      <span class="status-dot"></span>
+      <span id="conn-text">CONNECTING…</span>
+    </div>
+    <button class="theme-toggle" id="theme-btn" aria-label="Toggle theme" onclick="toggleTheme()">
+      <span class="theme-icon icon-sun">☀</span>
+      <span class="theme-icon icon-moon">☽</span>
+    </button>
+    <a href="monitor.html" class="btn btn-primary">Live Monitor</a>
+  </div>
+</nav>
+
+<div class="page-shell">
+  <div class="page-hero">
+    <div class="section-label">// CAPABILITIES</div>
+    <h1>Built for <em>production</em></h1>
+    <p>Sub-second inference, live API integration, modular architecture, and structured logging — designed to run zero-cost on CPU hardware with no cloud dependencies.</p>
+  </div>
+
+  <section class="inner">
+    <!-- Feature cards -->
+    <div class="section-label">// SYSTEM FEATURES</div>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:0ms">
+        <div class="feature-icon">🛰️</div>
+        <h4>OpenSky + adsb.lol Integration</h4>
+        <p>Direct REST API pulls over Indian airspace bounding box. Dual-source feeding — OpenSky for authenticated deep history, adsb.lol for open real-time feed. Configurable polling interval.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:60ms">
+        <div class="feature-icon">⚡</div>
+        <h4>Sub-second Inference</h4>
+        <p>All three pipeline layers run sequentially in under 400ms per batch, enabling real-time detection without queuing lag. No GPU required — optimised for CPU-only execution.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:120ms">
+        <div class="feature-icon">📊</div>
+        <h4>Feature Engineering</h4>
+        <p>Velocity deltas, heading consistency, barometric vs. geometric altitude divergence, and temporal sequence embedding. Per-aircraft history buffer resolves NaN issues from single-snapshot data.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:180ms">
+        <div class="feature-icon">🔔</div>
+        <h4>Severity Triage</h4>
+        <p>Three-tier severity — INFO, WARN, CRITICAL — with per-anomaly drill-down and confidence scores. Emergency squawks (7500/7600/7700) trigger immediate CRITICAL classification.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:240ms">
+        <div class="feature-icon">🗂️</div>
+        <h4>Structured Logging</h4>
+        <p>All detections persisted to structured JSON logs with ICAO24, callsign, detection layer, score, and UTC timestamp. SSE-powered live feed streams logs directly to the dashboard.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:300ms">
+        <div class="feature-icon">🧩</div>
+        <h4>Modular Architecture</h4>
+        <p>Each pipeline layer is independently swappable. Drop in XGBoost, VAE, or custom rules via a clean detector interface. Each module is runnable standalone via <code style="font-family:'Geist Mono',monospace;color:var(--accent);font-size:11px">python {module}.py</code>.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:360ms">
+        <div class="feature-icon">🔄</div>
+        <h4>Background Retraining</h4>
+        <p>Scheduled retraining loop ingests new live data and updates model artifacts on disk automatically. Dynamic F1 weights recalculate post-retrain, keeping the ensemble self-correcting.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:420ms">
+        <div class="feature-icon">📡</div>
+        <h4>Live Dashboard</h4>
+        <p>FastAPI-powered dashboard with SSE log feed, anomaly alert table, leaderboard, and real-time stats. Dark radar aesthetic with full light/dark theme support.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:480ms">
+        <div class="feature-icon">🔁</div>
+        <h4>Reproducible Pipeline</h4>
+        <p>Seeded RNG throughout (<code style="font-family:'Geist Mono',monospace;color:var(--accent);font-size:11px">RANDOM_SEED = 42</code>). Saved model artifacts mean training only runs once. Each step independently repeatable.</p>
+      </div>
+    </div>
+
+    <!-- Tech stack -->
+    <div class="section-label" style="margin-top:56px">// TECHNICAL STACK</div>
+    <div class="stack-grid">
+      <div class="stack-card" style="animation-delay:0ms">
+        <div class="stack-cat">Core</div>
+        <div class="stack-items">
+          <div class="stack-row"><span class="stack-name">Python</span><span class="stack-ver">3.11</span></div>
+          <div class="stack-row"><span class="stack-name">FastAPI</span><span class="stack-ver">uvicorn</span></div>
+          <div class="stack-row"><span class="stack-name">pandas</span><span class="stack-ver">2.2.2</span></div>
+          <div class="stack-row"><span class="stack-name">numpy</span><span class="stack-ver">1.26.4</span></div>
+        </div>
+      </div>
+      <div class="stack-card" style="animation-delay:60ms">
+        <div class="stack-cat">Machine Learning</div>
+        <div class="stack-items">
+          <div class="stack-row"><span class="stack-name">scikit-learn</span><span class="stack-ver">1.5.0</span></div>
+          <div class="stack-row"><span class="stack-name">tensorflow-cpu</span><span class="stack-ver">2.16.1</span></div>
+          <div class="stack-row"><span class="stack-name">tf-keras</span><span class="stack-ver">2.16.0</span></div>
+          <div class="stack-row"><span class="stack-name">keras</span><span class="stack-ver">3.3.3</span></div>
+        </div>
+      </div>
+      <div class="stack-card" style="animation-delay:120ms">
+        <div class="stack-cat">Data Sources</div>
+        <div class="stack-items">
+          <div class="stack-row"><span class="stack-name">OpenSky Network</span><span class="stack-ver">REST API</span></div>
+          <div class="stack-row"><span class="stack-name">adsb.lol</span><span class="stack-ver">Open API</span></div>
+          <div class="stack-row"><span class="stack-name">requests</span><span class="stack-ver">2.31.0</span></div>
+        </div>
+      </div>
+      <div class="stack-card" style="animation-delay:180ms">
+        <div class="stack-cat">Visualisation & Infra</div>
+        <div class="stack-items">
+          <div class="stack-row"><span class="stack-name">matplotlib</span><span class="stack-ver">3.9.0</span></div>
+          <div class="stack-row"><span class="stack-name">HTML/CSS/JS</span><span class="stack-ver">Dashboard UI</span></div>
+          <div class="stack-row"><span class="stack-name">SSE</span><span class="stack-ver">Live streaming</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design decisions accordion -->
+    <div class="section-label" style="margin-top:56px">// KEY DESIGN DECISIONS</div>
+    <div class="decisions-list">
+      <div class="decision-card" data-color="accent" style="animation-delay:0ms" onclick="toggleDecision(this)">
+        <div class="decision-q">Why use both live and synthetic data?<span class="decision-chevron">▾</span></div>
+        <div class="decision-body"><p>Live ADS-B data from OpenSky and adsb.lol provides real-world normal flight behaviour over Indian airspace, ensuring the models learn genuine traffic patterns. Synthetic anomalies are then injected into this real data for supervised training and evaluation, since real labelled attack data is not publicly available.</p></div>
+      </div>
+      <div class="decision-card" data-color="yellow" style="animation-delay:60ms" onclick="toggleDecision(this)">
+        <div class="decision-q">Why a feedforward autoencoder instead of LSTM?<span class="decision-chevron">▾</span></div>
+        <div class="decision-body"><p>The LSTM autoencoder was initially used but produced an anomaly/normal reconstruction ratio of ~0.97x — effectively random. The feedforward autoencoder evaluates each row independently, making anomalous feature combinations directly visible as reconstruction error spikes. Final ratio: 1.55x.</p></div>
+      </div>
+      <div class="decision-card" data-color="green" style="animation-delay:120ms" onclick="toggleDecision(this)">
+        <div class="decision-q">Why dynamic F1 weights in the ensemble?<span class="decision-chevron">▾</span></div>
+        <div class="decision-body"><p>Hardcoded weights (e.g. 0.4/0.3/0.3) don't adapt to actual detector performance. Dynamic weights mean the ensemble automatically favours whichever detector is strongest on the current dataset — if the autoencoder degrades, it automatically loses voting power.</p></div>
+      </div>
+      <div class="decision-card" data-color="red" style="animation-delay:180ms" onclick="toggleDecision(this)">
+        <div class="decision-q">Why clip outliers before MinMaxScaler?<span class="decision-chevron">▾</span></div>
+        <div class="decision-body"><p>Anomaly values (e.g. teleport: 500km/step) dominated the MinMaxScaler range, collapsing all normal variation to near zero. Clipping to 4σ of normal data preserves normal feature variation while keeping anomaly signal intact.</p></div>
+      </div>
+    </div>
+
+    <!-- Constraints -->
+    <div class="section-label" style="margin-top:56px">// CONSTRAINTS & PROPERTIES</div>
+    <div class="constraints-grid">
+      <div class="constraint-item" style="animation-delay:0ms"><span class="constraint-tick">✅</span><span class="constraint-text"><strong>Zero cost</strong> — OpenSky and adsb.lol are both free APIs</span></div>
+      <div class="constraint-item" style="animation-delay:50ms"><span class="constraint-tick">✅</span><span class="constraint-text"><strong>Fully local</strong> — runs on CPU, no GPU or cloud required</span></div>
+      <div class="constraint-item" style="animation-delay:100ms"><span class="constraint-tick">✅</span><span class="constraint-text"><strong>Real-time capable</strong> — live monitoring over Indian airspace</span></div>
+      <div class="constraint-item" style="animation-delay:150ms"><span class="constraint-tick">✅</span><span class="constraint-text"><strong>Reproducible</strong> — seeded RNG throughout (RANDOM_SEED = 42)</span></div>
+      <div class="constraint-item" style="animation-delay:200ms"><span class="constraint-tick">✅</span><span class="constraint-text"><strong>Modular</strong> — each pipeline step is independently runnable</span></div>
+      <div class="constraint-item" style="animation-delay:250ms"><span class="constraint-tick">✅</span><span class="constraint-text"><strong>Self-correcting</strong> — ensemble weights recalculate after each retrain</span></div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <div class="cta-card">
+      <h2>Start monitoring<br/>airspace now.</h2>
+      <p>Add your OpenSky credentials to <code style="font-family:'Geist Mono',monospace;color:var(--accent);font-size:14px">data_fetcher.py</code>, then run the server.</p>
+      <div class="cta-actions">
+        <a href="monitor.html" class="btn-large btn-primary">Open Live Monitor</a>
+        <a href="https://github.com/AlanJoseph7/sky-gate" target="_blank" class="btn-large btn-ghost">GitHub →</a>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-left">
+      <span class="footer-logo">SkyGate</span>
+      <div class="footer-sep"></div>
+      <span class="footer-copy">© 2025 · ADS-B Anomaly Detection</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/AlanJoseph7/sky-gate" target="_blank">GitHub</a>
+      <a href="https://opensky-network.org" target="_blank">OpenSky</a>
+      <a href="monitor.html">Monitor</a>
+      <a href="/api/anomalies" target="_blank">API</a>
+    </div>
+  </footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  document.getElementById('nav-logo-svg').innerHTML = NAV_LOGO_SVG;
+
+  function toggleDecision(card) {
+    const isOpen = card.classList.contains('open');
+    document.querySelectorAll('.decision-card.open').forEach(c => c.classList.remove('open'));
+    if (!isOpen) card.classList.add('open');
+  }
+
+  connectSSE();
+</script>
+</body>
+</html>

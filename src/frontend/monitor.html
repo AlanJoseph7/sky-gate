@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkyGate — Live Monitor</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='12' stroke='%2300d4ff' stroke-opacity='0.3' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='7' stroke='%2300d4ff' stroke-opacity='0.55' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2300d4ff'/%3E%3Cline x1='16' y1='4' x2='16' y2='28' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='4' y1='16' x2='28' y2='16' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='16' y1='16' x2='25' y2='9' stroke='%2300d4ff' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='10' r='1.8' fill='%23ff4444'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    /* Full-height monitor layout */
+    .monitor-page { display: flex; flex-direction: column; min-height: calc(100vh - 56px); }
+    .monitor-stats-strip {
+      display: flex;
+      gap: 0;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      border-bottom: 1px solid var(--glass-border);
+      box-shadow: 0 1px 0 var(--glass-border-top) inset;
+    }
+    .mstat { flex: 1; padding: 18px 28px; border-right: 1px solid var(--glass-border); cursor: default; position: relative; overflow: hidden; transition: background .3s; }
+    .mstat::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 80% at 50% 100%, var(--accent-glow), transparent); opacity: 0; transition: opacity .4s; }
+    .mstat:hover { background: var(--glass-bg-strong); }
+    .mstat:hover::before { opacity: 1; }
+    .mstat:last-child { border-right: none; }
+    .mstat-val { font-family: 'Geist Mono', monospace; font-size: 22px; font-weight: 800; color: var(--text); }
+    .mstat-val span { color: var(--accent); }
+    .mstat-label { font-size: 10px; color: var(--text-muted); letter-spacing: .05em; text-transform: uppercase; margin-top: 3px; }
+    /* Main dashboard area */
+    .monitor-main { flex: 1; padding: 28px 28px 60px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    /* Override dashboard grid for full-page use */
+    .monitor-main .dashboard-grid { margin-top: 0; }
+    /* Recent detections mini-table below */
+    .recent-wrap {
+      margin-top: 24px;
+      border-radius: var(--r-xl);
+      overflow: hidden;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur-sm);
+      border: 1px solid var(--glass-border);
+      border-top-color: var(--glass-border-top);
+      box-shadow: var(--glass-shadow);
+    }
+    .recent-header {
+      padding: 14px 22px;
+      background: rgba(0,0,0,0.2);
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    [data-theme="light"] .recent-header { background: rgba(70,50,20,0.04); }
+    .recent-title { font-size: 12px; font-weight: 700; color: var(--text); font-family: 'Geist Mono', monospace; }
+    .recent-see-all { font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--accent); text-decoration: none; letter-spacing: .04em; transition: opacity .2s; }
+    .recent-see-all:hover { opacity: .7; }
+    .recent-body { padding: 8px 0; max-height: 260px; overflow-y: auto; }
+    .recent-row {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1.5fr 1fr 1fr;
+      gap: 12px;
+      padding: 10px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      animation: logSlideIn .3s var(--ease-out) both;
+      transition: background .15s;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .recent-row:hover { background: rgba(255,255,255,0.03); }
+    [data-theme="light"] .recent-row { border-bottom-color: rgba(70,50,20,0.04); }
+    [data-theme="light"] .recent-row:hover { background: rgba(70,50,20,0.03); }
+    .recent-row:last-child { border-bottom: none; }
+    .recent-cell { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--text-muted); display: flex; align-items: center; }
+    .recent-cell.primary { color: var(--text); font-weight: 700; }
+    .empty-recent { padding: 32px; text-align: center; color: var(--text-dim); font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .04em; }
+    @media(max-width:700px) {
+      .monitor-stats-strip { flex-wrap: wrap; }
+      .mstat { min-width: 50%; }
+      .recent-row { grid-template-columns: 1fr 1fr 1fr; }
+      .recent-row .recent-cell:nth-child(4), .recent-row .recent-cell:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="theme-ripple"></div>
+<div id="aurora"></div>
+
+<nav id="main-nav">
+  <a href="index.html" class="nav-logo">
+    <div style="width:28px;height:28px" id="nav-logo-svg"></div>
+    <span class="nav-logo-text">SkyGate</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="pipeline.html">Pipeline</a></li>
+    <li><a href="monitor.html">Monitor</a></li>
+    <li><a href="anomalies.html">Anomalies</a></li>
+    <li><a href="features.html">Features</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="status-pill" id="connection-indicator">
+      <span class="status-dot"></span>
+      <span id="conn-text">CONNECTING…</span>
+    </div>
+    <button class="theme-toggle" id="theme-btn" aria-label="Toggle theme" onclick="toggleTheme()">
+      <span class="theme-icon icon-sun">☀</span>
+      <span class="theme-icon icon-moon">☽</span>
+    </button>
+    <a href="anomalies.html" class="btn btn-primary">Anomaly Ledger</a>
+  </div>
+</nav>
+
+<div class="page-shell">
+  <div class="monitor-page">
+    <!-- Stats strip -->
+    <div class="monitor-stats-strip">
+      <div class="mstat"><div class="mstat-val"><span id="stat-flights">—</span></div><div class="mstat-label">Flights Tracked</div></div>
+      <div class="mstat"><div class="mstat-val"><span id="stat-anomalies">—</span></div><div class="mstat-label">Anomalies Flagged</div></div>
+      <div class="mstat"><div class="mstat-val"><span id="stat-acc">—</span><span style="color:var(--text-muted);font-size:14px">%</span></div><div class="mstat-label">Detection Accuracy</div></div>
+      <div class="mstat"><div class="mstat-val" style="color:var(--green)"><span id="stat-lat">—</span><span style="color:var(--text-muted);font-size:14px">ms</span></div><div class="mstat-label">Avg Latency</div></div>
+    </div>
+
+    <!-- Main content -->
+    <div class="monitor-main">
+      <div class="dashboard-grid">
+        <!-- Terminal -->
+        <div class="monitor-wrap">
+          <div class="monitor-header">
+            <div class="monitor-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+            <div class="monitor-title">skygate — live_monitor.py</div>
+            <div class="monitor-badge">
+              <span class="status-dot" style="width:5px;height:5px;background:var(--green)"></span>
+              <span id="stream-status">CONNECTING</span>
+              <span style="color:#333;margin:0 2px">·</span>
+              <span class="pkt-count" id="packet-count">0 PKT</span>
+            </div>
+          </div>
+          <div class="monitor-body" id="log-output"></div>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="leaderboard-wrap">
+          <div class="leaderboard-header">
+            <div class="monitor-title" style="color:var(--text)">Top 5 Anomalies</div>
+            <select id="leaderboard-select" class="lb-select" onchange="renderLeaderboard()">
+              <option value="airlines">Airlines</option>
+              <option value="flights">Flights</option>
+              <option value="aircrafts">Aircrafts</option>
+            </select>
+          </div>
+          <div class="leaderboard-body" id="leaderboard-body">
+            <div style="color:var(--text-dim);font-family:'Geist Mono',monospace;font-size:11px">Awaiting data…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent detections -->
+      <div class="recent-wrap">
+        <div class="recent-header">
+          <span class="recent-title">RECENT DETECTIONS</span>
+          <a href="anomalies.html" class="recent-see-all">SEE ALL →</a>
+        </div>
+        <div class="recent-body" id="recent-body">
+          <div class="empty-recent">No detections yet — monitoring…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-left">
+      <span class="footer-logo">SkyGate</span>
+      <div class="footer-sep"></div>
+      <span class="footer-copy">© 2025 · ADS-B Anomaly Detection</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/AlanJoseph7/sky-gate" target="_blank">GitHub</a>
+      <a href="https://opensky-network.org" target="_blank">OpenSky</a>
+      <a href="anomalies.html">Anomalies</a>
+      <a href="/api/anomalies" target="_blank">API</a>
+    </div>
+  </footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  document.getElementById('nav-logo-svg').innerHTML = NAV_LOGO_SVG;
+
+  const SEV_BADGE = { critical:'badge-red', warn:'badge-yellow', info:'badge-blue' };
+  let recentAnomalies = [];
+
+  async function loadAnomalies() {
+    try {
+      const r = await fetch(`${API}/api/anomalies`);
+      if (!r.ok) return;
+      recentAnomalies = await r.json();
+      processLeaderboard(recentAnomalies);
+      renderRecent();
+    } catch(e) {}
+  }
+
+  function renderRecent() {
+    const body = document.getElementById('recent-body');
+    if (!recentAnomalies.length) { body.innerHTML = '<div class="empty-recent">No detections yet — monitoring…</div>'; return; }
+    body.innerHTML = recentAnomalies.slice(0, 10).map((a, i) => `
+      <a href="anomalies.html" class="recent-row" style="animation-delay:${i*30}ms">
+        <span class="recent-cell primary">${(a.icao24||'').toUpperCase()}</span>
+        <span class="recent-cell">${a.callsign||'N/A'}</span>
+        <span class="recent-cell">${a.anomaly||a.type||'—'}</span>
+        <span class="recent-cell"><span class="badge ${SEV_BADGE[a.severity]||'badge-blue'}">${(a.severity||'info').toUpperCase()}</span></span>
+        <span class="recent-cell" style="color:var(--text-dim)">${a.timestamp||'—'}</span>
+      </a>`).join('');
+  }
+
+  loadStats();
+  loadAnomalies();
+  connectSSE();
+  setInterval(loadAnomalies, 30000);
+</script>
+</body>
+</html>
