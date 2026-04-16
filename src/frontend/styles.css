@@ -76,12 +76,8 @@
 
 /* ── RESET ── */
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-html { scroll-behavior:smooth; }
-/* Override the styles.css opacity: 0 for the auth page specifically */
-body {
-    opacity: 1 !important;
-    display: block !important;
-}
+html { scroll-behavior:smooth; background:var(--bg); }
+body { background:var(--bg); color:var(--text); font-family:'Syne',sans-serif; }
 
 /* Ensure the card isn't stuck at opacity 0 from the fadeUp animation */
 .auth-card {
