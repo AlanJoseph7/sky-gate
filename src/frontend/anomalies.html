@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="styles.css"/>
+  <script src="auth-guard.js"></script>
   <style>
     /* Anomaly type legend */
     .anomaly-types {
@@ -76,12 +77,12 @@
     <!-- Anomaly type legend -->
     <div class="section-label">// ANOMALY TYPES</div>
     <div class="anomaly-types">
-      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Altitude Jump</div><div class="atype-desc">±5000–10000ft spike</div><div class="atype-layer">RULES + ISOLATION FOREST</div></div></div>
-      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Teleportation</div><div class="atype-desc">Impossible lat/lon jump</div><div class="atype-layer">RULES + ISOLATION FOREST</div></div></div>
-      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Speed Spike</div><div class="atype-desc">Exceeds physical velocity limits</div><div class="atype-layer">RULES + ISOLATION FOREST</div></div></div>
-      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Gradual Speed Drift</div><div class="atype-desc">Compounding over 10+ steps</div><div class="atype-layer">AUTOENCODER</div></div></div>
-      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Altitude Oscillation</div><div class="atype-desc">Rapid ±1500–2500ft pattern</div><div class="atype-layer">AUTOENCODER</div></div></div>
-      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Heading Oscillation</div><div class="atype-desc">Zigzag ±20–45° pattern</div><div class="atype-layer">AUTOENCODER</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Altitude Spike</div><div class="atype-desc">Sudden altitude change violating aircraft physics.</div><div class="atype-layer">LAYER: HEURISTIC RULES</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Position Teleport</div><div class="atype-desc">Impossible movement between coordinates (Spoofing).</div><div class="atype-layer">LAYER: HEURISTIC RULES</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--red)"></div><div><div class="atype-name">Speed Spike</div><div class="atype-desc">Velocity exceeds structural limits for aircraft type.</div><div class="atype-layer">LAYER: HEURISTIC RULES</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Statistical Outlier</div><div class="atype-desc">Anomalous feature relationship (e.g. low alt + high speed).</div><div class="atype-layer">LAYER: ISOLATION FOREST</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--yellow)"></div><div><div class="atype-name">Recon Error</div><div class="atype-desc">Flight pattern deviates from expected normal behavior.</div><div class="atype-layer">LAYER: LSTM AUTOENCODER</div></div></div>
+      <div class="atype-card"><div class="atype-dot" style="background:var(--accent)"></div><div><div class="atype-name">Unstable Signal</div><div class="atype-desc">Intermittent or jittery ADS-B packet reporting.</div><div class="atype-layer">MULTI-LAYER CONSENSUS</div></div></div>
     </div>
 
     <!-- Table -->
@@ -101,12 +102,12 @@
         <thead>
           <tr>
             <th></th>
+            <th></th>
             <th>ICAO 24</th>
             <th>CALLSIGN</th>
-            <th>ANOMALY TYPE</th>
-            <th>LAYER</th>
-            <th>SCORE</th>
-            <th>SEVERITY</th>
+            <th>ANOMALY DETECTION</th>
+            <th>DETECTION LAYER</th>
+            <th>RISK LEVEL</th>
             <th>TIMESTAMP</th>
           </tr>
         </thead>
@@ -140,7 +141,7 @@
 
   async function loadAnomalies() {
     try {
-      const r = await fetch(`${API}/api/anomalies`);
+      const r = await sgFetch(`${API}/api/anomalies`);
       if (!r.ok) return;
       allAnomalies = await r.json();
       renderTable();
@@ -173,8 +174,14 @@
           <td>${a.callsign||'N/A'}</td>
           <td>${a.anomaly||a.type||'—'}</td>
           <td><span class="badge ${LAYER_BADGE[a.layer]||'badge-blue'}">${a.layer||'—'}</span></td>
-          <td><div class="score-wrap"><span style="color:${sColor}">${scoreNum}</span><div class="score-bar"><div class="score-fill" style="width:${scorePct}%;background:${sColor}"></div></div></div></td>
-          <td><span class="badge ${SEV_BADGE[a.severity]||'badge-blue'}">${(a.severity||'info').toUpperCase()}</span></td>
+          <td>
+            <div class="score-wrap">
+              <span style="color:${sColor};font-weight:800;font-size:13px">${Math.round(scorePct)}%</span>
+              <div class="score-bar" style="flex:1;max-width:80px">
+                <div class="score-fill" style="width:${scorePct}%;background:${sColor}"></div>
+              </div>
+            </div>
+          </td>
           <td style="color:var(--text-dim)">${a.timestamp||'—'}</td>
         </tr>
         <tr class="detail-row" id="detail-${icao}">

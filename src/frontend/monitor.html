@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="styles.css"/>
+  <script src="auth-guard.js"></script>
   <style>
     /* Full-height monitor layout */
     .monitor-page { display: flex; flex-direction: column; min-height: calc(100vh - 56px); }
@@ -114,10 +115,10 @@
   <div class="monitor-page">
     <!-- Stats strip -->
     <div class="monitor-stats-strip">
-      <div class="mstat"><div class="mstat-val"><span id="stat-flights">—</span></div><div class="mstat-label">Flights Tracked</div></div>
-      <div class="mstat"><div class="mstat-val"><span id="stat-anomalies">—</span></div><div class="mstat-label">Anomalies Flagged</div></div>
-      <div class="mstat"><div class="mstat-val"><span id="stat-acc">—</span><span style="color:var(--text-muted);font-size:14px">%</span></div><div class="mstat-label">Detection Accuracy</div></div>
-      <div class="mstat"><div class="mstat-val" style="color:var(--green)"><span id="stat-lat">—</span><span style="color:var(--text-muted);font-size:14px">ms</span></div><div class="mstat-label">Avg Latency</div></div>
+      <div class="mstat"><div class="mstat-val"><span id="stat-flights">—</span></div><div class="mstat-label">Airborne Targets</div></div>
+      <div class="mstat"><div class="mstat-val"><span id="stat-anomalies">—</span></div><div class="mstat-label">Risky Flights Flagged</div></div>
+      <div class="mstat"><div class="mstat-val"><span id="stat-acc">—</span><span style="color:var(--text-muted);font-size:14px">%</span></div><div class="mstat-label">Confidence Score</div></div>
+      <div class="mstat"><div class="mstat-val" style="color:var(--green)"><span id="stat-lat">—</span><span style="color:var(--text-muted);font-size:14px">ms</span></div><div class="mstat-label">Inference Latency</div></div>
     </div>
 
     <!-- Main content -->
@@ -191,7 +192,7 @@
 
   async function loadAnomalies() {
     try {
-      const r = await fetch(`${API}/api/anomalies`);
+      const r = await sgFetch(`${API}/api/anomalies`);
       if (!r.ok) return;
       recentAnomalies = await r.json();
       processLeaderboard(recentAnomalies);
@@ -202,14 +203,27 @@
   function renderRecent() {
     const body = document.getElementById('recent-body');
     if (!recentAnomalies.length) { body.innerHTML = '<div class="empty-recent">No detections yet — monitoring…</div>'; return; }
-    body.innerHTML = recentAnomalies.slice(0, 10).map((a, i) => `
-      <a href="anomalies.html" class="recent-row" style="animation-delay:${i*30}ms">
-        <span class="recent-cell primary">${(a.icao24||'').toUpperCase()}</span>
-        <span class="recent-cell">${a.callsign||'N/A'}</span>
-        <span class="recent-cell">${a.anomaly||a.type||'—'}</span>
-        <span class="recent-cell"><span class="badge ${SEV_BADGE[a.severity]||'badge-blue'}">${(a.severity||'info').toUpperCase()}</span></span>
-        <span class="recent-cell" style="color:var(--text-dim)">${a.timestamp||'—'}</span>
-      </a>`).join('');
+    
+    // Style helper for risk bars
+    const scoreColor = s => s === 'critical' ? 'var(--red)' : s === 'warn' ? 'var(--yellow)' : 'var(--accent)';
+
+    body.innerHTML = recentAnomalies.slice(0, 10).map((a, i) => {
+      const scorePct = typeof a.score === 'number' ? Math.min(a.score, 1) * 100 : 0;
+      const sColor = scoreColor(a.severity);
+      return `
+        <a href="anomalies.html" class="recent-row" style="animation-delay:${i*30}ms">
+          <span class="recent-cell primary">${(a.icao24||'').toUpperCase()}</span>
+          <span class="recent-cell">${a.callsign||'N/A'}</span>
+          <span class="recent-cell">${a.anomaly||a.type||'—'}</span>
+          <span class="recent-cell">
+            <div class="score-wrap" style="width:100%">
+               <span style="color:${sColor};font-weight:700;margin-right:8px;font-size:10px">${Math.round(scorePct)}%</span>
+               <div class="score-bar" style="flex:1;max-width:60px;height:4px"><div class="score-fill" style="width:${scorePct}%;background:${sColor}"></div></div>
+            </div>
+          </span>
+          <span class="recent-cell" style="color:var(--text-dim);justify-content:flex-end">${a.timestamp||'—'}</span>
+        </a>`;
+    }).join('');
   }
 
   loadStats();

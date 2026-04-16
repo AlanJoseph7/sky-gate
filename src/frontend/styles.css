@@ -77,7 +77,24 @@
 /* ── RESET ── */
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
-body { background:var(--bg); color:var(--text); font-family:'Syne',sans-serif; overflow-x:hidden; }
+/* Override the styles.css opacity: 0 for the auth page specifically */
+body {
+    opacity: 1 !important;
+    display: block !important;
+}
+
+/* Ensure the card isn't stuck at opacity 0 from the fadeUp animation */
+.auth-card {
+    opacity: 1;
+    animation: fadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Bring the container to the front of the radar rings */
+.auth-container {
+    position: relative;
+    z-index: 100;
+}
+
 
 /* PERF: body::after scan lines REMOVED — fixed repeating-gradient triggers full repaint on every scroll */
 
@@ -154,6 +171,14 @@ nav {
 .status-pill.offline .status-dot { background:var(--red); animation:pulseRed 2.4s infinite; }
 @keyframes pulseGreen { 0%,100% { box-shadow:0 0 0 0 rgba(48,255,170,.45); } 50% { box-shadow:0 0 0 5px rgba(48,255,170,0); } }
 @keyframes pulseRed   { 0%,100% { box-shadow:0 0 0 0 rgba(255,80,80,.45); }  50% { box-shadow:0 0 0 5px rgba(255,80,80,0); } }
+
+/* Nav user info */
+.nav-user { display:flex; align-items:center; gap:12px; padding:4px 4px 4px 12px; border-radius:30px; background:rgba(255,255,255,0.04); border:1px solid var(--glass-border); margin-right:8px; }
+.user-greeting { font-size:11px; color:var(--text-muted); font-weight:500; font-family:'Geist Mono',monospace; letter-spacing:.02em; }
+.user-name { color:var(--text); font-weight:700; }
+.signout-btn { width:28px; height:28px; border-radius:50%; border:none; background:rgba(255,255,255,0.06); color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s, color .2s, transform .2s; }
+.signout-btn:hover { background:var(--red-dim); color:var(--red); transform:scale(1.1); }
+.signout-btn:active { transform:scale(0.95); }
 
 /* Buttons — transitions on transform+opacity only (composited) */
 .btn { padding:7px 16px; border-radius:var(--r); font-family:'Syne',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:transform .2s var(--ease-out), opacity .2s; text-decoration:none; letter-spacing:.01em; display:inline-flex; align-items:center; }

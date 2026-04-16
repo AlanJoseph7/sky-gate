@@ -38,6 +38,13 @@ from sse_starlette.sse import EventSourceResponse
 # ── SkyGate modules ───────────────────────────────────────────────────────────
 from data_fetcher import fetch_live_data
 from pipeline     import run_pipeline
+from flight_lookup import lookup_flight
+from auth         import verify_password, get_password_hash, create_access_token, decode_access_token
+from models       import User, init_db, get_db
+from sqlalchemy.orm import Session
+from fastapi      import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic     import BaseModel, Field
  
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared in-memory state
@@ -56,6 +63,16 @@ _state_lock = threading.Lock()
 # SSE subscriber queues — one asyncio.Queue per connected browser tab
 _sse_queues: list[asyncio.Queue] = []
 _loop: asyncio.AbstractEventLoop | None = None   # captured at startup
+
+# OAuth2 setup
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+
+# Pydantic models for API
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    full_name: str = Field(..., min_length=1, max_length=100)
+    password: str = Field(..., min_length=6, max_length=72)
+    email: str
  
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenSky credentials  (optional — metadata works anonymously at lower rate)
@@ -82,6 +99,13 @@ async def lifespan(app: FastAPI):
         _log("INFO", "Trainer scheduler started", "interval=3600s")
     except Exception as e:
         _log("WARN", "Trainer not started", str(e))
+
+    # Initialize users database
+    try:
+        init_db()
+        _log("INFO", "Authentication database ready", "users.db")
+    except Exception as e:
+        _log("ERROR", "Database initialization failed", str(e))
  
     # Background fetch/detect worker
     worker = threading.Thread(
@@ -201,23 +225,79 @@ def _now() -> str:
  
  
 # ─────────────────────────────────────────────────────────────────────────────
+# Auth Routes
+# ─────────────────────────────────────────────────────────────────────────────
+ 
+@app.post("/api/auth/signup")
+async def signup(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    new_user = User(
+        username=user.username, 
+        full_name=user.full_name, 
+        email=user.email, 
+        hashed_password=hashed_password
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {
+        "message": "User created successfully",
+        "full_name": new_user.full_name
+    }
+ 
+@app.post("/api/auth/login")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = create_access_token(data={"sub": user.username})
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "full_name": user.full_name or user.username
+    }
+ 
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    username: str = payload.get("sub")
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+ 
+# ─────────────────────────────────────────────────────────────────────────────
 # API Routes  — must be declared BEFORE the static file mount below
 # ─────────────────────────────────────────────────────────────────────────────
  
 @app.get("/api/stats")
-async def api_stats():
+async def api_stats(current_user: User = Depends(get_current_user)):
     with _state_lock:
         return JSONResponse(_stats_payload())
  
  
 @app.get("/api/anomalies")
-async def api_anomalies():
+async def api_anomalies(current_user: User = Depends(get_current_user)):
     with _state_lock:
         return JSONResponse(STATE["anomaly_log"][:50])
  
  
 @app.get("/api/logs")
-async def api_logs():
+async def api_logs(current_user: User = Depends(get_current_user)):
     with _state_lock:
         return JSONResponse(list(reversed(STATE["live_log"][:50])))
  
@@ -226,7 +306,7 @@ async def api_logs():
 # Flight Detail  — combines adsb.lol (live state) + OpenSky (metadata/history)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.get("/api/flight-detail/{icao24}")
-async def flight_detail(icao24: str):
+async def flight_detail(icao24: str, current_user: User = Depends(get_current_user)):
     icao24 = icao24.lower().strip()
     result: dict = {"icao24": icao24}
  
@@ -247,15 +327,20 @@ async def flight_detail(icao24: str):
             **meta_kwargs,
         )
  
+        now = int(time.time())
         if _opensky_auth:
-            now  = int(time.time())
+            # Authenticated: up to 24 hours back
             flt_task = _get(
                 f"https://opensky-network.org/api/flights/aircraft"
                 f"?icao24={icao24}&begin={now - 86400}&end={now}",
                 auth=_opensky_auth,
             )
         else:
-            flt_task = asyncio.sleep(0, result=None)
+            # Anonymous: OpenSky usually limited to last 2 hours
+            flt_task = _get(
+                f"https://opensky-network.org/api/flights/aircraft"
+                f"?icao24={icao24}&begin={now - 7200}&end={now}"
+            )
  
         adsblol_data, meta_data, flt_data = await asyncio.gather(
             adsblol_task, meta_task, flt_task
@@ -272,7 +357,8 @@ async def flight_detail(icao24: str):
                 )
                 result.update({
                     "callsign":      (ac.get("flight") or ac.get("callsign") or "").strip(),
-                    "registration":   ac.get("r") or "—",
+                    "registration":   ac.get("r") or ac.get("reg") or "—",
+                    "operator":       ac.get("ownOp") or ac.get("operator"),
                     "origin_country": ac.get("r")[:2] if ac.get("r") else "—",
                     "baro_altitude":  alt_ft,
                     "alt_unit":       "ft",
@@ -298,8 +384,26 @@ async def flight_detail(icao24: str):
  
         if flt_data and isinstance(flt_data, list) and len(flt_data) > 0:
             last = flt_data[-1]
-            result["departure_airport"] = last.get("estDepartureAirport") or "???"
-            result["arrival_airport"]   = last.get("estArrivalAirport")   or "???"
+            result["departure_airport"] = last.get("estDepartureAirport") or result.get("departure_airport")
+            result["arrival_airport"]   = last.get("estArrivalAirport")   or result.get("arrival_airport")
+
+        # ── ADSBDB Enrichment (Primary source for Route/Airline) ──────────────
+        callsign = result.get("callsign")
+        if callsign:
+            try:
+                # Run sync lookup in a thread to keep the server responsive
+                route = await asyncio.to_thread(lookup_flight, callsign)
+                if route:
+                    if route.get("origin"):
+                        result["departure_airport"] = route["origin"]
+                        result["departure_city"]    = route["origin_city"]
+                    if route.get("destination"):
+                        result["arrival_airport"]   = route["destination"]
+                        result["arrival_city"]      = route["destination_city"]
+                    if route.get("airline") and not result.get("operator"):
+                        result["operator"]          = route["airline"]
+            except Exception as e:
+                print(f"  [Server] Enrichment error for {callsign}: {e}")
  
     return JSONResponse(result)
  
@@ -308,7 +412,18 @@ async def flight_detail(icao24: str):
 # SSE
 # ─────────────────────────────────────────────────────────────────────────────
 @app.get("/api/stream")
-async def api_stream(request: Request):
+async def api_stream(request: Request, token: str = None):
+    # SSE usually doesn't send headers easily via EventSource,
+    # so we allow token via query param for the stream.
+    if not token:
+        # Check Authorization header as fallback
+        auth = request.headers.get("Authorization")
+        if auth and auth.startswith("Bearer "):
+            token = auth.split(" ")[1]
+    
+    if not token or decode_access_token(token) is None:
+        raise HTTPException(status_code=401, detail="Unauthorized stream access")
+
     q: asyncio.Queue = asyncio.Queue(maxsize=200)
     _sse_queues.append(q)
  

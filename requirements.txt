@@ -21,3 +21,9 @@ uvicorn[standard]
 sse-starlette
 requests
 httpx
+
+# Security & Auth
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart

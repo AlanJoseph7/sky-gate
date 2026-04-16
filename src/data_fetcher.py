@@ -230,10 +230,6 @@ def format_for_pipeline(df, fetch_time=None):
     # ICAO identifier
     out["icao"] = df["icao24"].str.upper().str.strip()
 
-    # Callsign (for adsbdb enrichment); OpenSky may omit or pad with spaces
-    cs = df["callsign"].fillna("").astype(str).str.strip().str.upper()
-    out["callsign"] = cs.replace({"NAN": "", "NONE": ""})
-
     # Position
     out["latitude"]  = pd.to_numeric(df["latitude"],  errors="coerce")
     out["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
