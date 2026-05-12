@@ -8,7 +8,7 @@ from datetime import datetime
 
 from utils import get_data_path, ensure_data_dirs, FEATURE_COLUMNS
 from data_fetcher import fetch_live_data, OPENSKY_USERNAME, OPENSKY_PASSWORD
-from features import compute_features
+from features import compute_features_live
 from rules import apply_rules
 from isolation_forest import run_isolation_forest
 from lstm_model import run_lstm_autoencoder
@@ -108,7 +108,7 @@ def run_detection_cycle(cycle_num):
             print("  ⚠️  Not enough multi-point aircraft for feature computation")
             return 0, 0
 
-        df_feat = compute_features(df_raw)
+        df_feat = compute_features_live(df_raw)
 
     except Exception as e:
         print(f"  ❌ Feature engineering failed: {e}")

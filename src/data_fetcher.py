@@ -9,9 +9,12 @@ from utils import get_data_path, ensure_data_dirs
 
 # -----------------------------
 # OPENSKY CREDENTIALS
+# Read from environment variables — never hardcode credentials.
+#   export OPENSKY_USERNAME=your_username
+#   export OPENSKY_PASSWORD=your_password
 # -----------------------------
-OPENSKY_USERNAME = "alanjosephkurian"
-OPENSKY_PASSWORD = "Appa@2525"        
+OPENSKY_USERNAME = os.environ.get("OPENSKY_USERNAME", "")
+OPENSKY_PASSWORD = os.environ.get("OPENSKY_PASSWORD", "")
 
 # -----------------------------
 # INDIAN AIRSPACE BOUNDING BOX
@@ -268,7 +271,7 @@ def format_for_pipeline(df, fetch_time=None):
 # -----------------------------
 # SAVE LIVE BATCH FOR RETRAINING
 # -----------------------------
-def save_live_batch(df: pd.DataFrame, path="data/live_log.csv"):
+def save_live_batch(df: pd.DataFrame, path=None):
     """
     Appends a live fetch batch to the rolling log file used
     for incremental model retraining.
@@ -276,7 +279,10 @@ def save_live_batch(df: pd.DataFrame, path="data/live_log.csv"):
     Skips anomaly-flagged rows if a 'final_anomaly' column is
     present, so the models don't learn to reconstruct attacks.
     """
-    os.makedirs("data", exist_ok=True)
+    if path is None:
+        path = get_data_path("live_log.csv")
+
+    ensure_data_dirs()
 
     clean = df.copy()
 

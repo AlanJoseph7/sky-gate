@@ -38,7 +38,7 @@ AE_MODEL_PATH       = "models/autoencoder.keras"
 AE_SCALER_PATH      = "models/ae_scaler.pkl"
 AE_THRESHOLD_PATH   = "models/ae_threshold.json"
 
-FEATURE_COLS = ["altitude", "velocity", "heading", "latitude", "longitude"]
+from utils import FEATURE_COLUMNS as FEATURE_COLS
 
 
 # ══════════════════════════════════════════════════════════

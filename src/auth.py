@@ -1,14 +1,26 @@
 import bcrypt
 import os
 import hashlib
-from datetime import datetime, timedelta
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 
 # -----------------------------
 # Configuration
 # -----------------------------
-SECRET_KEY = os.getenv("SKYGATE_SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
+# JWT secret MUST be set via environment variable in production.
+# A random fallback is generated for local development only.
+_DEFAULT_SECRET = secrets.token_hex(32)
+SECRET_KEY = os.environ.get("SKYGATE_SECRET_KEY", _DEFAULT_SECRET)
+if "SKYGATE_SECRET_KEY" not in os.environ:
+    import warnings
+    warnings.warn(
+        "SKYGATE_SECRET_KEY not set — using a random key. "
+        "JWTs will be invalidated on server restart. "
+        "Set SKYGATE_SECRET_KEY in your environment for production.",
+        stacklevel=2,
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440 # 24 hours
 
@@ -44,9 +56,9 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

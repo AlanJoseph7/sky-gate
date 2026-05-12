@@ -3,9 +3,10 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+from utils import get_model_path
 
 # Where ensemble weights + threshold are persisted after synthetic training
-WEIGHTS_PATH = "models/ensemble_weights.json"
+WEIGHTS_PATH = get_model_path("ensemble_weights.json")
 
 # -----------------------------
 # FINAL DETECTION LOGIC

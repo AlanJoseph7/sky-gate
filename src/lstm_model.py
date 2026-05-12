@@ -11,7 +11,7 @@ from tf_keras.models import Model
 from tf_keras.layers import Input, Dense, Dropout
 from tf_keras.callbacks import EarlyStopping
 
-from utils import get_data_path, ensure_data_dirs, FEATURE_COLUMNS, RANDOM_SEED, load_keras_model_compatible
+from utils import get_data_path, get_model_path, ensure_data_dirs, FEATURE_COLUMNS, RANDOM_SEED, load_keras_model_compatible
 
 # -----------------------------
 # CONFIG
@@ -22,9 +22,9 @@ BATCH_SIZE = 32
 # -----------------------------
 # MODEL PATHS
 # -----------------------------
-AE_MODEL_PATH     = "models/autoencoder.keras"
-AE_SCALER_PATH    = "models/ae_scaler.pkl"
-AE_THRESHOLD_PATH = "models/ae_threshold.json"
+AE_MODEL_PATH     = get_model_path("autoencoder.keras")
+AE_SCALER_PATH    = get_model_path("ae_scaler.pkl")
+AE_THRESHOLD_PATH = get_model_path("ae_threshold.json")
 
 
 # -----------------------------

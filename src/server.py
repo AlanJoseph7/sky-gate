@@ -34,6 +34,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
  
 # ── SkyGate modules ───────────────────────────────────────────────────────────
 from data_fetcher import fetch_live_data
@@ -68,11 +71,13 @@ _loop: asyncio.AbstractEventLoop | None = None   # captured at startup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # Pydantic models for API
+from pydantic import EmailStr
+
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     full_name: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=6, max_length=72)
-    email: str
+    email: EmailStr
  
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenSky credentials  (optional — metadata works anonymously at lower rate)
@@ -121,12 +126,21 @@ async def lifespan(app: FastAPI):
 # App
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="SkyGate", lifespan=lifespan)
+
+# Rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
  
+# CORS: restrict to specific origins in production via SKYGATE_CORS_ORIGINS env var.
+# Defaults to localhost for development. Set to comma-separated origins in production.
+_cors_origins = os.getenv("SKYGATE_CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[o.strip() for o in _cors_origins.split(",")],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=True,
 )
  
 FRONTEND_DIR = Path(__file__).parent / "frontend"
@@ -229,7 +243,8 @@ def _now() -> str:
 # ─────────────────────────────────────────────────────────────────────────────
  
 @app.post("/api/auth/signup")
-async def signup(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def signup(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -250,7 +265,8 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
     }
  
 @app.post("/api/auth/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
