@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
+
+from sqlalchemy import Column, String, DateTime
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
@@ -13,7 +14,7 @@ class User(Base):
     full_name = Column(String, nullable=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 # Database setup helper
 from sqlalchemy import create_engine

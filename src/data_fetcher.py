@@ -1,17 +1,21 @@
-import requests
-import pandas as pd
-import numpy as np
-from datetime import datetime
+import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
+import numpy as np
+import pandas as pd
+import requests
+
+from config import cfg
 from utils import get_data_path, ensure_data_dirs
 
+log = logging.getLogger(__name__)
+
 # -----------------------------
-# OPENSKY CREDENTIALS
+# OPENSKY CREDENTIALS  (from config.py)
 # -----------------------------
-OPENSKY_USERNAME = "alanjosephkurian"
-OPENSKY_PASSWORD = "Appa@2525"        
+OPENSKY_USERNAME = cfg.OPENSKY_USERNAME
+OPENSKY_PASSWORD = cfg.OPENSKY_PASSWORD
 
 # -----------------------------
 # INDIAN AIRSPACE BOUNDING BOX
@@ -24,11 +28,11 @@ INDIA_BOUNDS = {
 }
 
 # -----------------------------
-# ADSB.LOL API CONFIG
+# ADSB.LOL API CONFIG  (from config.py)
 # -----------------------------
-ADSBLOL_API_BASE = os.environ.get("ADSBLOL_API_BASE", "https://api.adsb.lol")
-ADSBLOL_API_PATH = os.environ.get("ADSBLOL_API_PATH", "/v2/point/20.5/82.5/250")
-ADSBLOL_API_KEY  = os.environ.get("ADSBLOL_API_KEY", "")
+ADSBLOL_API_BASE = cfg.ADSBLOL_API_BASE
+ADSBLOL_API_PATH = cfg.ADSBLOL_API_PATH
+ADSBLOL_API_KEY  = cfg.ADSBLOL_API_KEY
 
 # -----------------------------
 # OPENSKY STATE VECTOR COLUMNS
@@ -95,13 +99,13 @@ def fetch_live_data(*args, **kwargs):
                 flights = data
 
             if not flights:
-                print("  [adsb.lol] No flights in response.")
+                log.info("No flights in response.")
                 return None
 
             df = parse_adsb_lol_response(flights)
 
             if df is None or df.empty:
-                print("  [adsb.lol] No valid airborne flights found.")
+                log.info("No valid airborne flights found.")
                 return None
 
             # Filter to Indian airspace only
@@ -113,7 +117,7 @@ def fetch_live_data(*args, **kwargs):
             ].copy()
 
             if len(df) == 0:
-                print("  [adsb.lol] No flights within Indian airspace bounds.")
+                log.info("No flights within Indian airspace bounds.")
                 return None
 
             # Filter out ground flights when possible
@@ -121,7 +125,7 @@ def fetch_live_data(*args, **kwargs):
                 df = df[df["on_ground"] == False].copy()
 
             if len(df) == 0:
-                print("  [adsb.lol] No airborne flights found.")
+                log.info("No airborne flights found.")
                 return None
 
             result = format_for_pipeline(df, data.get("now") or data.get("time") or data.get("timestamp"))
@@ -132,27 +136,27 @@ def fetch_live_data(*args, **kwargs):
             return result
 
         elif response.status_code == 401:
-            print("  [adsb.lol] Authentication failed — check ADSBLOL_API_KEY.")
+            log.error("Authentication failed — check ADSBLOL_API_KEY.")
             return None
 
         elif response.status_code == 429:
-            print("  [adsb.lol] Rate limit hit — slow down requests.")
+            log.warning("Rate limit hit — slow down requests.")
             return None
 
         else:
-            print(f"  [adsb.lol] API error: HTTP {response.status_code}")
+            log.error("API error: HTTP %d", response.status_code)
             return None
 
     except requests.exceptions.ConnectionError:
-        print("  [adsb.lol] Connection error — check your internet.")
+        log.error("Connection error — check your internet.")
         return None
 
     except requests.exceptions.Timeout:
-        print("  [adsb.lol] Request timed out.")
+        log.warning("Request timed out.")
         return None
 
     except Exception as e:
-        print(f"  [adsb.lol] Unexpected error: {e}")
+        log.exception("Unexpected error: %s", e)
         return None
 
 
@@ -223,9 +227,9 @@ def format_for_pipeline(df, fetch_time=None):
             else:
                 out["timestamp"] = pd.to_datetime(fetch_time, unit="s")
         except Exception:
-            out["timestamp"] = datetime.utcnow()
+            out["timestamp"] = datetime.now(timezone.utc)
     else:
-        out["timestamp"] = datetime.utcnow()
+        out["timestamp"] = datetime.now(timezone.utc)
 
     # ICAO identifier
     out["icao"] = df["icao24"].str.upper().str.strip()
@@ -260,7 +264,7 @@ def format_for_pipeline(df, fetch_time=None):
     out["velocity"] = out["velocity"].clip(0, 700)
     out["heading"]  = out["heading"].clip(0, 360)
 
-    print(f"  [adsb.lol] {len(out)} airborne flights over Indian airspace.")
+    log.info("%d airborne flights over Indian airspace.", len(out))
 
     return out
 
@@ -268,7 +272,7 @@ def format_for_pipeline(df, fetch_time=None):
 # -----------------------------
 # SAVE LIVE BATCH FOR RETRAINING
 # -----------------------------
-def save_live_batch(df: pd.DataFrame, path="data/live_log.csv"):
+def save_live_batch(df: pd.DataFrame, path=None):
     """
     Appends a live fetch batch to the rolling log file used
     for incremental model retraining.
@@ -276,7 +280,10 @@ def save_live_batch(df: pd.DataFrame, path="data/live_log.csv"):
     Skips anomaly-flagged rows if a 'final_anomaly' column is
     present, so the models don't learn to reconstruct attacks.
     """
-    os.makedirs("data", exist_ok=True)
+    if path is None:
+        path = get_data_path("live_log.csv")
+
+    ensure_data_dirs()
 
     clean = df.copy()
 
@@ -286,16 +293,16 @@ def save_live_batch(df: pd.DataFrame, path="data/live_log.csv"):
         clean = clean[clean["final_anomaly"] == 0]
         excluded = before - len(clean)
         if excluded > 0:
-            print(f"  [Logger] Excluded {excluded} flagged rows from training log.")
+            log.debug("Excluded %d flagged rows from training log.", excluded)
 
     if len(clean) == 0:
         return
 
-    clean["fetch_time"] = datetime.utcnow().isoformat()
+    clean["fetch_time"] = datetime.now(timezone.utc).isoformat()
 
     file_exists = os.path.exists(path)
     clean.to_csv(path, mode="a", header=not file_exists, index=False)
-    print(f"  [Logger] Appended {len(clean)} rows to {path}")
+    log.info("Appended %d rows to %s", len(clean), path)
 
 
 # -----------------------------

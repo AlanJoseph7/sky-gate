@@ -10,7 +10,7 @@ from utils import get_data_path, ensure_data_dirs
 REQUIRED_COLUMNS = ["icao", "timestamp", "latitude", "longitude", "altitude", "velocity", "heading"]
 
 # Path where last-seen positions are persisted across live cycles
-HISTORY_PATH = "data/live_aircraft_history.csv"
+HISTORY_PATH = get_data_path("live_aircraft_history.csv")
 
 # -----------------------------
 # FEATURE CLAMP LIMITS
