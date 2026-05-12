@@ -39,15 +39,20 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
  
 # ── SkyGate modules ───────────────────────────────────────────────────────────
+from config import cfg
 from data_fetcher import fetch_live_data
-from pipeline     import run_pipeline
+from pipeline import run_pipeline
 from flight_lookup import lookup_flight
-from auth         import verify_password, get_password_hash, create_access_token, decode_access_token
-from models       import User, init_db, get_db
+from auth import verify_password, get_password_hash, create_access_token, decode_access_token
+from models import User, init_db, get_db
+
+import logging
 from sqlalchemy.orm import Session
-from fastapi      import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic     import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
+
+log = logging.getLogger(__name__)
  
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared in-memory state
@@ -60,7 +65,7 @@ STATE: dict = {
     "anomaly_log":       [],     # most recent anomalies — frontend table
     "live_log":          [],     # terminal log lines — frontend feed
 }
-MAX_LOG     = 200
+MAX_LOG     = cfg.MAX_LOG_ENTRIES
 _state_lock = threading.Lock()
  
 # SSE subscriber queues — one asyncio.Queue per connected browser tab
@@ -71,8 +76,6 @@ _loop: asyncio.AbstractEventLoop | None = None   # captured at startup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # Pydantic models for API
-from pydantic import EmailStr
-
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     full_name: str = Field(..., min_length=1, max_length=100)
@@ -134,10 +137,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
  
 # CORS: restrict to specific origins in production via SKYGATE_CORS_ORIGINS env var.
 # Defaults to localhost for development. Set to comma-separated origins in production.
-_cors_origins = os.getenv("SKYGATE_CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _cors_origins.split(",")],
+    allow_origins=cfg.CORS_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
     allow_credentials=True,
@@ -242,8 +244,19 @@ def _now() -> str:
 # Auth Routes
 # ─────────────────────────────────────────────────────────────────────────────
  
+@app.get("/api/health")
+async def health_check():
+    """Unauthenticated health probe for load balancers and uptime monitors."""
+    with _state_lock:
+        return JSONResponse({
+            "status": "healthy",
+            "flights_today": STATE["flights_today"],
+            "anomalies_flagged": STATE["anomalies_flagged"],
+        })
+
+
 @app.post("/api/auth/signup")
-@limiter.limit("5/minute")
+@limiter.limit(cfg.RATE_LIMIT_SIGNUP)
 async def signup(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
@@ -265,7 +278,7 @@ async def signup(request: Request, user: UserCreate, db: Session = Depends(get_d
     }
  
 @app.post("/api/auth/login")
-@limiter.limit("10/minute")
+@limiter.limit(cfg.RATE_LIMIT_LOGIN)
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -498,11 +511,16 @@ else:
 # Dev entry point
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("SkyGate dashboard -> http://localhost:5000")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s  %(levelname)-5s  %(name)s  %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    print(f"SkyGate dashboard -> http://localhost:{cfg.PORT}")
     uvicorn.run(
         "server:app",
-        host="0.0.0.0",
-        port=5000,
+        host=cfg.HOST,
+        port=cfg.PORT,
         reload=False,
         log_level="info",
     )

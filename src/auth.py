@@ -1,28 +1,21 @@
 import bcrypt
-import os
 import hashlib
-import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
 from jose import JWTError, jwt
 
+from config import cfg
+
+log = logging.getLogger(__name__)
+
 # -----------------------------
-# Configuration
+# Configuration  (delegated to config.py)
 # -----------------------------
-# JWT secret MUST be set via environment variable in production.
-# A random fallback is generated for local development only.
-_DEFAULT_SECRET = secrets.token_hex(32)
-SECRET_KEY = os.environ.get("SKYGATE_SECRET_KEY", _DEFAULT_SECRET)
-if "SKYGATE_SECRET_KEY" not in os.environ:
-    import warnings
-    warnings.warn(
-        "SKYGATE_SECRET_KEY not set — using a random key. "
-        "JWTs will be invalidated on server restart. "
-        "Set SKYGATE_SECRET_KEY in your environment for production.",
-        stacklevel=2,
-    )
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440 # 24 hours
+SECRET_KEY = cfg.JWT_SECRET_KEY
+ALGORITHM = cfg.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = cfg.JWT_EXPIRE_MINUTES
 
 # -----------------------------
 # Password Hashing
