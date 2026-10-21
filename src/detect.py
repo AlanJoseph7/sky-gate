@@ -3,9 +3,10 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+from utils import get_model_path
 
 # Where ensemble weights + threshold are persisted after synthetic training
-WEIGHTS_PATH = "models/ensemble_weights.json"
+WEIGHTS_PATH = get_model_path("ensemble_weights.json")
 
 # -----------------------------
 # FINAL DETECTION LOGIC
@@ -75,8 +76,17 @@ def combine_detections(df):
         )
         print(f"Best threshold (max F1): {best_thresh:.2f}")
 
+        # Compute the final ensemble F1 at the chosen threshold (used by the
+        # dashboard to display a real accuracy metric instead of a placeholder)
+        final_preds  = (score_tmp >= best_thresh).astype(int)
+        f1_ensemble  = f1_score(df["label"], final_preds, zero_division=0)
+        prec_ensemble = precision_score(df["label"], final_preds, zero_division=0)
+        rec_ensemble  = recall_score(df["label"],  final_preds, zero_division=0)
+        print(f"Ensemble F1: {f1_ensemble:.4f}  "
+              f"Precision: {prec_ensemble:.4f}  Recall: {rec_ensemble:.4f}")
+
         # Persist for live mode
-        _save_weights(w_rule, w_if, w_lstm, best_thresh)
+        _save_weights(w_rule, w_if, w_lstm, best_thresh, f1_ensemble)
 
     # -----------------------------
     # WEIGHTED SCORE (both modes)
@@ -95,8 +105,14 @@ def combine_detections(df):
 # -----------------------------
 # WEIGHT PERSISTENCE HELPERS
 # -----------------------------
-def _save_weights(w_rule, w_if, w_lstm, threshold):
-    """Saves ensemble weights and decision threshold to disk."""
+def _save_weights(w_rule, w_if, w_lstm, threshold, f1_ensemble=None):
+    """
+    Saves ensemble weights, decision threshold, and (optionally) the
+    ensemble F1 score to disk.
+
+    f1_ensemble is written only during synthetic training so the server
+    can display a real accuracy metric sourced from actual evaluation.
+    """
     os.makedirs("models", exist_ok=True)
     payload = {
         "w_rule":     round(float(w_rule),     6),
@@ -104,6 +120,8 @@ def _save_weights(w_rule, w_if, w_lstm, threshold):
         "w_lstm":     round(float(w_lstm),     6),
         "threshold":  round(float(threshold),  4),
     }
+    if f1_ensemble is not None:
+        payload["f1_ensemble"] = round(float(f1_ensemble), 6)
     with open(WEIGHTS_PATH, "w") as f:
         json.dump(payload, f, indent=2)
     print(f"  [detect] Ensemble weights saved to {WEIGHTS_PATH}")

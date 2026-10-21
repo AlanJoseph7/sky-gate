@@ -49,6 +49,7 @@
   </a>
   <ul class="nav-links">
     <li><a href="pipeline.html">Pipeline</a></li>
+    <li><a href="siem.html">SIEM</a></li>
     <li><a href="monitor.html">Monitor</a></li>
     <li><a href="anomalies.html">Anomalies</a></li>
     <li><a href="features.html">Features</a></li>
@@ -101,14 +102,13 @@
       <table>
         <thead>
           <tr>
-            <th></th>
-            <th></th>
+            <th style="width: 60px;">&nbsp;</th>
+            <th>FLIGHT NUMBER</th>
             <th>ICAO 24</th>
-            <th>CALLSIGN</th>
-            <th>ANOMALY DETECTION</th>
+            <th>THREAT CLASSIFICATION</th>
             <th>DETECTION LAYER</th>
             <th>RISK LEVEL</th>
-            <th>TIMESTAMP</th>
+            <th style="text-align: right;">TIMESTAMP</th>
           </tr>
         </thead>
         <tbody id="anomaly-tbody"></tbody>
@@ -166,14 +166,20 @@
       const scoreNum = typeof score === 'number' ? score.toFixed(2) : (score || '—');
       const scorePct = typeof score === 'number' ? Math.min(score, 1) * 100 : 0;
       const sColor = scoreColor(a.severity);
-      const icao = (a.icao24 || '').toLowerCase();
+      const icao = (a.icao24 || '').toLowerCase().replace(/[^a-f0-9]/g, '');
+      const callsign = (a.callsign && a.callsign.trim() !== '') ? a.callsign : 'UNKNOWN';
+      const safeCallsign = escapeHtml(callsign);
+      const safeThreat = escapeHtml(a.threat_class || a.anomaly || a.type || '—');
+      const safeLayer = escapeHtml(a.layer || '—');
+      const safeTs = escapeHtml(a.timestamp || '—');
+      const safeJsCallsign = callsign.replace(/[^a-zA-Z0-9_\-]/g, '');
       return `
-        <tr class="data-row" data-icao="${icao}" style="animation-delay:${i*22}ms" onclick="toggleDetail(this,'${icao}','${a.callsign||''}')">
+        <tr class="data-row" data-icao="${icao}" style="animation-delay:${i*22}ms" onclick="toggleDetail(this,'${icao}','${safeJsCallsign}')">
           <td><span class="expand-chevron">▾</span></td>
-          <td><span style="color:var(--accent);font-weight:700">${icao.toUpperCase()}</span></td>
-          <td>${a.callsign||'N/A'}</td>
-          <td>${a.anomaly||a.type||'—'}</td>
-          <td><span class="badge ${LAYER_BADGE[a.layer]||'badge-blue'}">${a.layer||'—'}</span></td>
+          <td><span style="color:var(--accent);font-weight:700">${safeCallsign}</span></td>
+          <td style="font-family:'Geist Mono',monospace;color:var(--text-muted)">${icao.toUpperCase()}</td>
+          <td>${safeThreat}</td>
+          <td><span class="badge ${LAYER_BADGE[a.layer]||'badge-blue'}">${safeLayer}</span></td>
           <td>
             <div class="score-wrap">
               <span style="color:${sColor};font-weight:800;font-size:13px">${Math.round(scorePct)}%</span>
@@ -182,13 +188,33 @@
               </div>
             </div>
           </td>
-          <td style="color:var(--text-dim)">${a.timestamp||'—'}</td>
+          <td style="color:var(--text-dim)">${safeTs}</td>
         </tr>
         <tr class="detail-row" id="detail-${icao}">
-          <td colspan="8">
-            <div class="detail-panel" id="panel-${icao}">
-              <div class="detail-loading" id="loading-${icao}"><div class="detail-spinner"></div>Fetching flight data…</div>
-              <div class="detail-inner" id="inner-${icao}" style="display:none"></div>
+          <td colspan="100" style="padding:0; width:100%;">
+            <div class="detail-panel" id="panel-${icao}" style="width:100%; box-sizing:border-box;">
+              <div class="detail-wrapper" style="width:100%; box-sizing:border-box; background:linear-gradient(135deg, rgba(58,223,255,0.025) 0%, rgba(0,0,0,0.12) 100%); border-top:1px solid rgba(58,223,255,0.09);">
+                <div class="siem-header" style="padding:24px 28px 0; width:100%; box-sizing:border-box;">
+                  <div style="background:var(--red-dim); padding:14px 18px; margin-bottom:20px; border:1px solid rgba(255,80,80,0.2); border-radius:8px; display:${a.quarantine ? 'flex' : 'none'}; flex-wrap:wrap; align-items:center; gap:16px;">
+                     <span class="badge badge-red" style="font-size:11px; padding:5px 12px; letter-spacing:0.06em;">QUARANTINED</span>
+                     <span style="font-size:12px; color:var(--text-muted); font-family:'Geist Mono',monospace;">This track has been automatically isolated from the main ATC feed due to unverified telemetry.</span>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:28px; padding-bottom:16px; border-bottom:1px solid var(--glass-border); font-size:12px; font-family:'Geist Mono',monospace; align-items:center;">
+                     <div style="color:var(--text-dim); font-weight:700; letter-spacing:0.05em;">SIEM VERIFICATION:</div>
+                     <div style="color:${a.mlat_verified ? 'var(--green)' : 'var(--red)'}; display:flex; align-items:center; gap:8px;">
+                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span> MLAT: ${a.mlat_verified ? 'VERIFIED' : 'UNVERIFIED'}
+                     </div>
+                     <div style="color:${a.valid_signature ? 'var(--green)' : 'var(--red)'}; display:flex; align-items:center; gap:8px;">
+                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span> PKI SIG: ${a.valid_signature ? 'VALID' : 'INVALID'}
+                     </div>
+                     <div style="color:var(--yellow); display:flex; align-items:center; gap:8px;">
+                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span> RSSI: ${a.rssi_dbm || 'N/A'} dBm
+                     </div>
+                  </div>
+                </div>
+                <div class="detail-loading" id="loading-${icao}"><div class="detail-spinner"></div>Fetching flight data…</div>
+                <div class="detail-inner" id="inner-${icao}" style="display:none; border-top:none; background:transparent; padding-top:20px; width:100%; box-sizing:border-box;"></div>
+              </div>
             </div>
           </td>
         </tr>`;

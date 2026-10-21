@@ -94,6 +94,7 @@
   </a>
   <ul class="nav-links">
     <li><a href="pipeline.html">Pipeline</a></li>
+    <li><a href="siem.html">SIEM</a></li>
     <li><a href="monitor.html">Monitor</a></li>
     <li><a href="anomalies.html">Anomalies</a></li>
     <li><a href="features.html">Features</a></li>
@@ -194,7 +195,9 @@
     try {
       const r = await sgFetch(`${API}/api/anomalies`);
       if (!r.ok) return;
-      recentAnomalies = await r.json();
+      const allData = await r.json();
+      // SIEM Automated Quarantine: Hide unverified critical tracks from main ATC view
+      recentAnomalies = allData.filter(a => !a.quarantine);
       processLeaderboard(recentAnomalies);
       renderRecent();
     } catch(e) {}
@@ -202,7 +205,14 @@
 
   function renderRecent() {
     const body = document.getElementById('recent-body');
-    if (!recentAnomalies.length) { body.innerHTML = '<div class="empty-recent">No detections yet — monitoring…</div>'; return; }
+    if (window._activeFlights === 0) {
+      body.innerHTML = '<div class="empty-recent">No flights currently flying through the selected airspace.</div>';
+      return;
+    }
+    if (!recentAnomalies.length) { 
+      body.innerHTML = '<div class="empty-recent">No detections yet — monitoring…</div>'; 
+      return; 
+    }
     
     // Style helper for risk bars
     const scoreColor = s => s === 'critical' ? 'var(--red)' : s === 'warn' ? 'var(--yellow)' : 'var(--accent)';
@@ -212,9 +222,9 @@
       const sColor = scoreColor(a.severity);
       return `
         <a href="anomalies.html" class="recent-row" style="animation-delay:${i*30}ms">
-          <span class="recent-cell primary">${(a.icao24||'').toUpperCase()}</span>
-          <span class="recent-cell">${a.callsign||'N/A'}</span>
-          <span class="recent-cell">${a.anomaly||a.type||'—'}</span>
+          <span class="recent-cell primary">${a.callsign && a.callsign.trim() !== '' ? a.callsign : 'UNKNOWN'}</span>
+          <span class="recent-cell">${(a.icao24||'').toUpperCase()}</span>
+          <span class="recent-cell">${a.threat_class||a.anomaly||a.type||'—'}</span>
           <span class="recent-cell">
             <div class="score-wrap" style="width:100%">
                <span style="color:${sColor};font-weight:700;margin-right:8px;font-size:10px">${Math.round(scorePct)}%</span>

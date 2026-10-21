@@ -110,9 +110,13 @@ def run_pipeline(flights: pd.DataFrame) -> list[dict]:
 
     anomalies = []
     ts_now = datetime.now(timezone.utc).strftime("%H:%M:%S")
+    
+    from siem.threat_classifier import enrich_and_classify
 
     for _, row in flagged.iterrows():
-        anomalies.append(_build_anomaly_dict(row, ts_now))
+        anomaly_dict = _build_anomaly_dict(row, ts_now)
+        anomaly_dict = enrich_and_classify(anomaly_dict)
+        anomalies.append(anomaly_dict)
 
     return anomalies
 

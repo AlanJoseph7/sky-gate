@@ -6,13 +6,13 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 import joblib
 
-from utils import get_data_path, ensure_data_dirs, FEATURE_COLUMNS, RANDOM_SEED
+from utils import get_data_path, get_model_path, ensure_data_dirs, FEATURE_COLUMNS, RANDOM_SEED
 
 # -----------------------------
 # MODEL PATHS
 # -----------------------------
-IF_MODEL_PATH  = "models/iso_forest.pkl"
-IF_SCALER_PATH = "models/if_scaler.pkl"
+IF_MODEL_PATH  = get_model_path("iso_forest.pkl")
+IF_SCALER_PATH = get_model_path("if_scaler.pkl")
 
 
 # -----------------------------

@@ -12,10 +12,10 @@ from utils import get_data_path, ensure_data_dirs
 #   - distance_km : km     (haversine output, correct)
 #   - heading_change: degrees (0–180 after wrap, correct)
 # -----------------------------
-MAX_CLIMB_RATE     = 50    # ft/s  (~3000 fpm, aggressive but possible)
-MAX_SPEED          = 630   # knots (above any commercial aircraft limit)
-MAX_DISTANCE       = 50    # km per timestep (teleport detection)
-MAX_HEADING_CHANGE = 45    # degrees per timestep
+MAX_CLIMB_RATE     = 25    # ft/s  (~1500 fpm, catches more climbs/descents)
+MAX_SPEED          = 450   # knots (more conservative, catches faster commercial flights)
+MAX_DISTANCE       = 20    # km per timestep (tighter teleport detection)
+MAX_HEADING_CHANGE = 15    # degrees per timestep (catches sharper turns)
 
 # -----------------------------
 # RULE-BASED DETECTION

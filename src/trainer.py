@@ -22,7 +22,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from utils import load_keras_model_compatible
+from utils import load_keras_model_compatible, get_data_path, get_model_path, FEATURE_COLUMNS as FEATURE_COLS
 
 # -----------------------------
 # CONFIG
@@ -30,15 +30,13 @@ from utils import load_keras_model_compatible
 RETRAIN_INTERVAL    = 3600        # seconds between retraining runs
 MIN_ROWS_TO_RETRAIN = 500         # don't retrain on too little data
 SLIDING_WINDOW      = 10_000      # use only the most recent N rows
-LIVE_LOG_PATH       = "data/live_log.csv"
-THRESHOLDS_PATH     = "models/thresholds.json"
-IF_MODEL_PATH       = "models/iso_forest.pkl"
-IF_SCALER_PATH      = "models/if_scaler.pkl"
-AE_MODEL_PATH       = "models/autoencoder.keras"
-AE_SCALER_PATH      = "models/ae_scaler.pkl"
-AE_THRESHOLD_PATH   = "models/ae_threshold.json"
-
-FEATURE_COLS = ["altitude", "velocity", "heading", "latitude", "longitude"]
+LIVE_LOG_PATH       = get_data_path("live_log.csv")
+THRESHOLDS_PATH     = get_model_path("thresholds.json")
+IF_MODEL_PATH       = get_model_path("iso_forest.pkl")
+IF_SCALER_PATH      = get_model_path("if_scaler.pkl")
+AE_MODEL_PATH       = get_model_path("autoencoder.keras")
+AE_SCALER_PATH      = get_model_path("ae_scaler.pkl")
+AE_THRESHOLD_PATH   = get_model_path("ae_threshold.json")
 
 
 # ══════════════════════════════════════════════════════════
@@ -199,10 +197,10 @@ def finetune_autoencoder(log_path=LIVE_LOG_PATH,
 # ══════════════════════════════════════════════════════════
 def run_retraining():
     """Runs all three retraining steps in sequence."""
-    print(f"\n{'─'*60}")
-    print(f"  [Trainer] Starting scheduled retraining — "
+    print(f"\n{'-'*60}")
+    print(f"  [Trainer] Starting scheduled retraining - "
           f"{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
 
     update_rule_thresholds()
     retrain_isolation_forest()

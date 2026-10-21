@@ -140,26 +140,30 @@ SkyGate/
 ### 1. Clone and set up environment
 
 ```bash
-<<<<<<< HEAD
 git clone https://github.com/AlanJoseph7/sky-gate.git
-=======
-git clone https://github.com/AlanJoseph7/skygate.git
->>>>>>> 570cd86794631274e805174c8b78800ecfde3062
-cd skygate
+cd sky-gate
 python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # Mac/Linux
 pip install -r requirements.txt
 ```
 
-### 2. Configure API credentials
+### 2. Configure environment variables
 
-Add your credentials to `utils.py` or a `.env` file:
+Copy the example env file and fill in your values:
 
-```python
-OPENSKY_USERNAME = "your_opensky_username"
-OPENSKY_PASSWORD = "your_opensky_password"
-# adsb.lol is open — no key required
+```bash
+cp .env.example .env
+```
+
+Required for production:
+```bash
+# Generate a JWT secret key
+export SKYGATE_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+
+# OpenSky credentials (optional — adsb.lol is open, no key required)
+export OPENSKY_USERNAME="your_opensky_username"
+export OPENSKY_PASSWORD="your_opensky_password"
 ```
 
 ### 3. Run the full pipeline (live + synthetic)
@@ -171,16 +175,24 @@ python main.py
 
 That's it. One command runs all steps sequentially — fetching live ADS-B data, injecting synthetic anomalies for training, running the detection pipeline, and printing a final summary table.
 
-### 4. Run live monitoring mode
+### 4. Run the Web Dashboard & SIEM
+
+```bash
+python src/server.py
+```
+Open [http://localhost:5000](http://localhost:5000) in your browser. This launches the FastAPI server and decoupled ML detection worker with access to the Overview, Live Radar Monitor, Aviation SIEM, and Telemetry Inspector.
+
+### 5. Run live monitoring CLI mode (optional)
 
 ```bash
 cd src
 python main.py --live
 ```
 
-Fetches real ADS-B data over Indian airspace every 30 seconds and runs the full detection pipeline continuously.
+Fetches real ADS-B data over Indian airspace every 30 seconds and runs the full detection pipeline continuously in terminal.
 
-### 5. Run individual steps
+### 6. Run individual pipeline steps
+
 
 ```bash
 cd src

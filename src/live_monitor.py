@@ -4,11 +4,11 @@ os.environ["TF_USE_LEGACY_KERAS"] = "1"
 import time
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 
 from utils import get_data_path, ensure_data_dirs, FEATURE_COLUMNS
 from data_fetcher import fetch_live_data, OPENSKY_USERNAME, OPENSKY_PASSWORD
-from features import compute_features
+from features import compute_features_live
 from rules import apply_rules
 from isolation_forest import run_isolation_forest
 from lstm_model import run_lstm_autoencoder
@@ -73,7 +73,7 @@ def run_detection_cycle(cycle_num):
     the full SkyGate pipeline, and prints any anomalies detected.
     """
     cycle_start = time.time()
-    timestamp   = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp   = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     print_cycle_header(cycle_num, timestamp)
 
     # -----------------------------
@@ -108,7 +108,7 @@ def run_detection_cycle(cycle_num):
             print("  ⚠️  Not enough multi-point aircraft for feature computation")
             return 0, 0
 
-        df_feat = compute_features(df_raw)
+        df_feat = compute_features_live(df_raw)
 
     except Exception as e:
         print(f"  ❌ Feature engineering failed: {e}")
@@ -222,9 +222,9 @@ def run_live_monitor(
     if not OPENSKY_USERNAME or not OPENSKY_PASSWORD:
         print(f"{YELLOW}")
         print("  ⚠️  WARNING: OpenSky credentials not set!")
-        print("  Edit data_fetcher.py and fill in:")
-        print("    OPENSKY_USERNAME = 'your_username'")
-        print("    OPENSKY_PASSWORD = 'your_password'")
+        print("  Set environment variables:")
+        print("    export OPENSKY_USERNAME=your_username")
+        print("    export OPENSKY_PASSWORD=your_password")
         print(f"  Anonymous access is limited to 400 requests/day.{RESET}\n")
 
     print(f"  Fetch interval : {interval}s")

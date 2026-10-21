@@ -19,11 +19,15 @@ protobuf==4.25.9
 fastapi
 uvicorn[standard]
 sse-starlette
+slowapi
 requests
 httpx
 
 # Security & Auth
 sqlalchemy
+bcrypt
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+email-validator
+python-dotenv

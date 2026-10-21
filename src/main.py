@@ -36,12 +36,12 @@ def run_step(step_number, step_name, fn, *args, **kwargs):
     try:
         result  = fn(*args, **kwargs)
         elapsed = time.time() - start
-        print(f"\n  ✅ {step_name} completed in {elapsed:.1f}s")
+        print(f"\n  [OK] {step_name} completed in {elapsed:.1f}s")
         return result
 
     except Exception as e:
         elapsed = time.time() - start
-        print(f"\n  ❌ {step_name} FAILED after {elapsed:.1f}s")
+        print(f"\n  [FAIL] {step_name} FAILED after {elapsed:.1f}s")
         print(f"\n  Error: {e}")
         traceback.print_exc()
         print(f"\nPipeline stopped at Step {step_number}. Fix the error above and rerun.")
@@ -227,7 +227,7 @@ def print_live_alerts(df, cycle_num):
     print(f"  Anomalies flagged       : {len(flagged)}")
 
     if len(flagged) == 0:
-        print("  ✅ No anomalies detected this cycle.")
+        print("  [OK] No anomalies detected this cycle.")
         return
 
     print(f"\n  {'ICAO':<10} {'Lat':>8} {'Lon':>8} {'Alt(ft)':>10} "
@@ -333,7 +333,7 @@ def run_synthetic_mode():
 
     total_time = time.time() - pipeline_start
     print(f"  Total pipeline time: {total_time:.1f}s\n")
-    print("  ✅ Ensemble weights saved to models/ensemble_weights.json")
+    print("  [OK] Ensemble weights saved to models/ensemble_weights.json")
     print("     Switch MODE to 'live' to start real-time monitoring.\n")
 
 

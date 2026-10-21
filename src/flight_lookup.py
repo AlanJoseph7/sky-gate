@@ -13,13 +13,15 @@ API used: https://api.adsbdb.com/v0/callsign/{callsign}
   - Returns: airline, origin airport, destination airport
 """
 
+import re
 import time
 import requests
 
 # ── Config ────────────────────────────────────────────────────────────────────
-ADSBDB_URL  = "https://api.adsbdb.com/v0/callsign/{callsign}"
-CACHE_TTL   = 3600      # seconds — 1 hour per entry
-REQUEST_TIMEOUT = 4     # seconds — don't block the worker thread
+ADSBDB_URL     = "https://api.adsbdb.com/v0/callsign/{callsign}"
+CACHE_TTL      = 3600      # seconds — 1 hour per entry
+REQUEST_TIMEOUT = 4        # seconds — don't block the worker thread
+MAX_CACHE_SIZE = 5000      # max cached flights to prevent memory exhaustion
 
 
 # ── In-memory cache: callsign (str) → enriched dict ──────────────────────────
@@ -36,20 +38,12 @@ def lookup_flight(callsign: str) -> dict:
 
     Always returns a dict — empty strings for unknown fields so callers
     never need to guard against missing keys.
-
-    Keys returned:
-        airline          str   "Air India"
-        flight_number    str   "AI302"   (IATA) or "AIC302" (ICAO fallback)
-        origin           str   "DEL"
-        origin_city      str   "New Delhi"
-        destination      str   "BOM"
-        destination_city str   "Mumbai"
     """
     if not callsign:
         return _empty()
 
     cs = callsign.strip().upper()
-    if cs in ("", "N/A", "UNKNOWN"):
+    if cs in ("", "N/A", "UNKNOWN") or not re.match(r"^[A-Z0-9_\- ]{1,12}$", cs):
         return _empty()
 
     # ── Cache hit ─────────────────────────────────────────────────────────────
@@ -58,6 +52,12 @@ def lookup_flight(callsign: str) -> dict:
         return {k: v for k, v in cached.items() if not k.startswith("_")}
 
     # ── Network lookup ────────────────────────────────────────────────────────
+    # Enforce bounded cache size: evict oldest entry if limit reached
+    if len(_cache) >= MAX_CACHE_SIZE:
+        oldest_key = min(_cache, key=lambda k: _cache[k].get("_ts", 0), default=None)
+        if oldest_key:
+            _cache.pop(oldest_key, None)
+
     result = _fetch(cs)
     result["_ts"] = time.time()
     _cache[cs]    = result

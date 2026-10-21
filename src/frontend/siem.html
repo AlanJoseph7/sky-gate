@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkyGate — SIEM Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='12' stroke='%2300d4ff' stroke-opacity='0.3' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='7' stroke='%2300d4ff' stroke-opacity='0.55' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2300d4ff'/%3E%3Cline x1='16' y1='4' x2='16' y2='28' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='4' y1='16' x2='28' y2='16' stroke='%2300d4ff' stroke-opacity='0.2' stroke-width='0.6'/%3E%3Cline x1='16' y1='16' x2='25' y2='9' stroke='%2300d4ff' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='10' r='1.8' fill='%23ff4444'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <script src="auth-guard.js"></script>
+  <style>
+    /* SIEM specific styles */
+    .siem-stats-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .siem-stat-card {
+      flex: 1;
+      min-width: 200px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-top-color: var(--glass-border-top);
+      border-radius: var(--r-xl);
+      padding: 24px;
+      box-shadow: var(--glass-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      animation: fadeUp .4s var(--ease-out) both;
+    }
+    .siem-stat-val {
+      font-family: 'Geist Mono', monospace;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .siem-stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Timeline Chart */
+    .timeline-chart {
+      height: 180px;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      padding-top: 20px;
+      margin-bottom: 20px;
+    }
+    .timeline-bar-wrapper {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      position: relative;
+      group: timeline-bar;
+    }
+    .timeline-bar {
+      width: 100%;
+      background: var(--accent-dim);
+      border-radius: 4px 4px 0 0;
+      position: relative;
+      transition: height 0.3s ease, background 0.2s;
+    }
+    .timeline-bar-crit {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--red);
+      border-radius: 4px 4px 0 0;
+      transition: height 0.3s ease;
+    }
+    .timeline-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 9px;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 8px;
+    }
+    .timeline-bar-wrapper:hover .timeline-bar {
+      background: var(--accent);
+    }
+    .timeline-tooltip {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--glass-bg-strong);
+      border: 1px solid var(--glass-border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'Geist Mono', monospace;
+      font-size: 10px;
+      color: var(--text);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .timeline-bar-wrapper:hover .timeline-tooltip {
+      opacity: 1;
+    }
+    
+    /* Top Threats Table */
+    .threat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .threat-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-family: 'Geist Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-dim);
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .threat-table td {
+      padding: 14px 16px;
+      font-family: 'Geist Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255,255,255,0.02);
+    }
+    .threat-table tr:hover td {
+      background: rgba(255,255,255,0.02);
+    }
+    [data-theme="light"] .threat-table tr:hover td {
+      background: rgba(70,50,20,0.02);
+    }
+  </style>
+</head>
+<body>
+<div id="theme-ripple"></div>
+<div id="aurora"></div>
+
+<!-- NAV -->
+<nav id="main-nav">
+  <a href="index.html" class="nav-logo">
+    <div style="width:28px;height:28px" id="nav-logo-svg"></div>
+    <span class="nav-logo-text">SkyGate</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="pipeline.html">Pipeline</a></li>
+    <li><a href="siem.html" class="active">SIEM</a></li>
+    <li><a href="monitor.html">Monitor</a></li>
+    <li><a href="anomalies.html">Anomalies</a></li>
+    <li><a href="features.html">Features</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="status-pill" id="connection-indicator">
+      <span class="status-dot"></span>
+      <span id="conn-text">CONNECTING…</span>
+    </div>
+    <button class="theme-toggle" id="theme-btn" aria-label="Toggle theme" onclick="toggleTheme()">
+      <span class="theme-icon icon-sun">☀</span>
+      <span class="theme-icon icon-moon">☽</span>
+    </button>
+  </div>
+</nav>
+
+<div class="page-shell">
+  <header class="page-hero">
+    <div class="section-label">Security Information & Event Management</div>
+    <h1>SIEM <em>Dashboard</em></h1>
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 12px;">
+      <p style="margin: 0; max-width: 650px;">High-level threat intelligence and automated triage overview. Computed in real-time from the anomaly ledger.</p>
+      <div style="display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 6px 10px; border-radius: 8px;">
+        <select id="sim-attack-select" style="background: rgba(0,0,0,0.4); color: var(--text); border: 1px solid var(--glass-border); border-radius: 6px; padding: 6px 10px; font-family: 'Geist Mono', monospace; font-size: 11px;">
+          <option value="teleport">⚡ Teleportation (Malicious Spoofing)</option>
+          <option value="altitude">🔺 Altitude Spike (Altimeter Tampering)</option>
+          <option value="speed">🚀 Speed Spike (SDR Ghost Track)</option>
+          <option value="drift">📉 Gradual Drift (GPS Jamming)</option>
+        </select>
+        <button id="sim-attack-btn" onclick="triggerSimulatedAttack()" style="background: linear-gradient(135deg, rgba(255,80,80,0.85), rgba(220,30,30,0.95)); color: #fff; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; font-family: 'Geist Mono', monospace; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
+          <span>🚨</span> Simulate Attack
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <section class="inner">
+    <!-- KPI CARDS -->
+    <div class="siem-stats-bar">
+      <div class="siem-stat-card" style="animation-delay: 0s">
+        <div class="siem-stat-label">Total Anomalies</div>
+        <div class="siem-stat-val" id="siem-total">—</div>
+      </div>
+      <div class="siem-stat-card" style="animation-delay: 0.1s">
+        <div class="siem-stat-label" style="color: var(--red)">Critical Threats</div>
+        <div class="siem-stat-val" id="siem-critical">—</div>
+      </div>
+      <div class="siem-stat-card" style="animation-delay: 0.2s">
+        <div class="siem-stat-label" style="color: var(--yellow)">Auto-Quarantined</div>
+        <div class="siem-stat-val" id="siem-quarantine">—</div>
+      </div>
+      <div class="siem-stat-card" style="animation-delay: 0.3s">
+        <div class="siem-stat-label">Top Threat Class</div>
+        <div class="siem-stat-val" id="siem-top-class" style="font-size: 18px; display: flex; align-items: center; height: 100%;">—</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- LEFT COL: Timeline & Top Threats -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- TIMELINE -->
+        <div class="monitor-wrap">
+          <div class="monitor-header">
+            <span class="table-header-title">12-Hour Threat Timeline</span>
+          </div>
+          <div style="padding: 24px;">
+            <div class="timeline-chart" id="timeline-chart">
+              <!-- Bars injected by JS -->
+            </div>
+            <div style="display: flex; gap: 16px; justify-content: flex-end; font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--text-dim);">
+              <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block;width:8px;height:8px;background:var(--accent-dim);border-radius:2px;"></span> All Anomalies</div>
+              <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block;width:8px;height:8px;background:var(--red);border-radius:2px;"></span> Critical Threats</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOP THREATS TABLE -->
+        <div class="monitor-wrap" style="flex: 1;">
+          <div class="monitor-header">
+            <span class="table-header-title">Recent High-Severity Threats</span>
+            <a href="anomalies.html" style="font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--accent); text-decoration: none;">View Ledger →</a>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="threat-table">
+              <thead>
+                <tr>
+                  <th>Flight</th>
+                  <th>Severity</th>
+                  <th>Threat Class</th>
+                  <th>Score</th>
+                  <th>Verifications</th>
+                </tr>
+              </thead>
+              <tbody id="top-threats-body">
+                <!-- Rows injected by JS -->
+                <tr><td colspan="5" style="text-align: center; padding: 32px;">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COL: Breakdown -->
+      <div class="leaderboard-wrap">
+        <div class="leaderboard-header">
+          <span class="table-header-title">Threat Taxonomy Breakdown</span>
+        </div>
+        <div class="leaderboard-body" id="threat-breakdown-body">
+           <!-- Bars injected by JS -->
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-left">
+      <span class="footer-logo">SkyGate</span>
+      <div class="footer-sep"></div>
+      <span class="footer-copy">© 2025 · ADS-B Anomaly Detection</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/AlanJoseph7/sky-gate" target="_blank">GitHub</a>
+      <a href="pipeline.html">Pipeline</a>
+      <a href="/api/siem/summary" target="_blank">API</a>
+    </div>
+  </footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  document.getElementById('nav-logo-svg').innerHTML = NAV_LOGO_SVG;
+  connectSSE(); // Just for the connection status pill
+
+  async function loadSiemData() {
+    try {
+      // 1. Summary KPIs
+      const sumRes = await sgFetch(`${API}/api/siem/summary`);
+      if (sumRes.ok) {
+        const sum = await sumRes.json();
+        document.getElementById('siem-total').textContent = sum.total_anomalies;
+        document.getElementById('siem-critical').textContent = sum.critical_count;
+        document.getElementById('siem-quarantine').textContent = sum.quarantine_count;
+        document.getElementById('siem-top-class').textContent = sum.top_threat_class;
+      }
+
+      // 2. Timeline
+      const timeRes = await sgFetch(`${API}/api/siem/timeline`);
+      if (timeRes.ok) {
+        const timeData = await timeRes.json();
+        const maxCount = Math.max(...timeData.map(d => d.count), 1);
+        const chartEl = document.getElementById('timeline-chart');
+        
+        chartEl.innerHTML = timeData.map(d => {
+          const hPct = (d.count / maxCount) * 100;
+          const critPct = d.count > 0 ? (d.critical / d.count) * 100 : 0;
+          return `
+            <div class="timeline-bar-wrapper">
+              <div class="timeline-tooltip">${d.hour} - ${d.count} total, ${d.critical} critical</div>
+              <div class="timeline-bar" style="height: ${hPct}%">
+                <div class="timeline-bar-crit" style="height: ${critPct}%"></div>
+              </div>
+              <div class="timeline-label">${d.hour.split(':')[0]}h</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 3. Breakdown
+      const brkRes = await sgFetch(`${API}/api/siem/threat-breakdown`);
+      if (brkRes.ok) {
+        const brkData = await brkRes.json();
+        const total = brkData.reduce((acc, d) => acc + d.count, 0);
+        const sorted = brkData.sort((a, b) => b.count - a.count);
+        
+        const colors = ['var(--red)', 'var(--yellow)', 'var(--accent)', 'var(--green)', 'var(--text-dim)', '#b784a7', '#84b7a1'];
+        
+        document.getElementById('threat-breakdown-body').innerHTML = sorted.map((d, i) => {
+          const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
+          const color = colors[i % colors.length];
+          return `
+            <div class="lb-item" style="animation-delay:${i * 40}ms; opacity: 1;">
+              <div class="lb-info">
+                <span class="lb-name">${d.label}</span>
+                <span class="lb-stat"><span style="color:${color};font-weight:700">${d.count}</span> (${pct}%)</span>
+              </div>
+              <div class="lb-bar-bg">
+                <div class="lb-bar-fill" style="width:${Math.min(pct, 100)}%;background:${color}"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 4. Top Threats
+      const topRes = await sgFetch(`${API}/api/siem/top-threats`);
+      if (topRes.ok) {
+        const topData = await topRes.json();
+        const tbody = document.getElementById('top-threats-body');
+        
+        if (topData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No anomalies recorded yet.</td></tr>';
+        } else {
+          tbody.innerHTML = topData.map(a => {
+            const sevColor = a.severity === 'critical' ? 'var(--red)' : (a.severity === 'warn' ? 'var(--yellow)' : 'var(--accent)');
+            
+            let verif = [];
+            if (!a.mlat_verified) verif.push('<span style="color:var(--red)" title="MLAT Failed">M-</span>');
+            else verif.push('<span style="color:var(--green)" title="MLAT Passed">M+</span>');
+            
+            if (!a.valid_signature) verif.push('<span style="color:var(--red)" title="Sig Failed">S-</span>');
+            else verif.push('<span style="color:var(--green)" title="Sig Passed">S+</span>');
+
+            return `
+              <tr>
+                <td><strong style="color:var(--text)">${escapeHtml(a.callsign || 'UNKNOWN')}</strong> <span style="opacity:0.5">[${escapeHtml(a.icao24 || '')}]</span></td>
+                <td><span class="badge" style="background:var(--glass-bg);color:${sevColor};border:1px solid ${sevColor}33">${escapeHtml((a.severity || 'info').toUpperCase())}</span></td>
+                <td>${escapeHtml(a.threat_class || 'Unknown')}</td>
+                <td style="color:var(--text)">${Number(a.score || 0).toFixed(3)}</td>
+                <td style="font-family:'Geist Mono',monospace;letter-spacing:2px;">${verif.join(' ')}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+
+    } catch (e) {
+      console.error("Failed to load SIEM data:", e);
+    }
+  }
+
+  // Load initially and refresh every 30s
+  loadSiemData();
+  setInterval(loadSiemData, 30000);
+
+  async function triggerSimulatedAttack() {
+    const btn = document.getElementById('sim-attack-btn');
+    const sel = document.getElementById('sim-attack-select');
+    const attack = sel ? sel.value : 'teleport';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> Injecting…';
+    }
+    try {
+      const callsigns = { speed: 'MACH2', altitude: 'CLIMB99', drift: 'DRIFT01', teleport: 'GHOST99' };
+      const icaos = { speed: 'DEAD02', altitude: 'SPOOF01', drift: 'DEAD03', teleport: 'DEAD99' };
+      const res = await sgFetch(`${API}/api/simulate-attack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attack_type: attack,
+          callsign: callsigns[attack] || 'GHOST99',
+          icao24: icaos[attack] || 'DEAD99'
+        })
+      });
+      if (res.ok) {
+        await loadSiemData();
+      }
+    } catch(e) {
+      console.error('Simulation error:', e);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚨</span> Simulate Attack';
+      }
+    }
+  }
+</script>
+</body>
+</html>

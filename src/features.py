@@ -10,7 +10,7 @@ from utils import get_data_path, ensure_data_dirs
 REQUIRED_COLUMNS = ["icao", "timestamp", "latitude", "longitude", "altitude", "velocity", "heading"]
 
 # Path where last-seen positions are persisted across live cycles
-HISTORY_PATH = "data/live_aircraft_history.csv"
+HISTORY_PATH = get_data_path("live_aircraft_history.csv")
 
 # -----------------------------
 # FEATURE CLAMP LIMITS
@@ -77,11 +77,9 @@ def _engineer_features(df):
     columns dropped. Does NOT call dropna() — callers handle that.
     """
     # Time difference (seconds)
-    df["delta_time"] = (
-        df.groupby("icao")["timestamp"]
-        .diff()
-        .dt.total_seconds()
-    )
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+    delta_s = df.groupby("icao")["timestamp"].diff()
+    df["delta_time"] = delta_s.dt.total_seconds()
 
     # Previous values
     df["prev_lat"]     = df.groupby("icao")["latitude"].shift(1)
@@ -176,7 +174,7 @@ def compute_features_live(df):
 
     print(f"Input rows: {len(df)}")
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     df = df.sort_values(by=["icao", "timestamp"]).reset_index(drop=True)
 
     # Mark new rows so we can strip history rows after feature computation
@@ -186,7 +184,7 @@ def compute_features_live(df):
     history = _load_history()
 
     if history is not None and len(history) > 0:
-        history["timestamp"] = pd.to_datetime(history["timestamp"])
+        history["timestamp"] = pd.to_datetime(history["timestamp"], utc=True, errors="coerce")
         history["_is_new"]   = False
 
         # Only keep history rows for aircraft present in current batch
@@ -200,7 +198,7 @@ def compute_features_live(df):
         print(f"  [Features] History loaded: {matched} aircraft matched from previous cycle.")
     else:
         combined = df.copy()
-        print("  [Features] No history yet — first cycle will have higher drop rate.")
+        print("  [Features] No history yet - first cycle will have higher drop rate.")
 
     # ── Compute features on combined df ───────────────────────────
     combined = _engineer_features(combined)
@@ -241,7 +239,7 @@ def compute_features_live(df):
         print(f"  [Features] Hard-dropped {hard_dropped} rows (missing raw positional data).")
     if nan_before > 0:
         print(f"  [Features] Filled {nan_before} NaN derived-feature cells with 0 "
-              f"(first-time aircraft — no prior history).")
+              f"(first-time aircraft - no prior history).")
     print(f"Rows dropped during cleanup : {hard_dropped}")
     print(f"Rows remaining              : {rows_after}")
 
@@ -353,9 +351,9 @@ def _print_feature_diagnostics(df):
     print(f"NaN values remaining : {nan_count}")
 
     if inf_count > 0 or nan_count > 0:
-        print("WARNING: inf/NaN values still present — LSTM scaling will be broken.")
+        print("WARNING: inf/NaN values still present - LSTM scaling will be broken.")
     else:
-        print("✅ All feature values are finite and clean.")
+        print("[OK] All feature values are finite and clean.")
 
 
 # -----------------------------
